@@ -3,6 +3,8 @@ import { parseArgs } from "node:util";
 import { existsSync, statSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { startReviewServer, type ReviewServerHandle } from "./server.js";
+import { openInBrowser } from "./browser.js";
 
 export const USAGE = `Usage: ai-review-board <file.html>
 
@@ -46,7 +48,18 @@ export function validateArtifactFile(path: string): void {
   }
 }
 
-export function main(argv: string[] = process.argv.slice(2)): number {
+export interface OpenReviewDeps {
+  openBrowser?: (url: string) => void;
+}
+
+export async function openReview(file: string, deps: OpenReviewDeps = {}): Promise<ReviewServerHandle> {
+  const handle = await startReviewServer({ artifactPath: file });
+  process.stdout.write(`${handle.url}\n`);
+  (deps.openBrowser ?? openInBrowser)(handle.url);
+  return handle;
+}
+
+export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
   const parsed = parseCliArgs(argv);
 
   if (parsed.help) {
@@ -70,7 +83,8 @@ export function main(argv: string[] = process.argv.slice(2)): number {
     throw err;
   }
 
-  process.stdout.write(`ai-review-board scaffold: would open ${parsed.file}\n`);
+  // Foreground process: the open server handle keeps the event loop alive.
+  await openReview(parsed.file);
   return 0;
 }
 
@@ -80,5 +94,14 @@ function isMainModule(): boolean {
 }
 
 if (isMainModule()) {
-  process.exit(main());
+  main()
+    .then((exitCode) => {
+      if (exitCode !== 0) {
+        process.exit(exitCode);
+      }
+    })
+    .catch((err: Error) => {
+      process.stderr.write(`Error: ${err.message}\n`);
+      process.exit(1);
+    });
 }

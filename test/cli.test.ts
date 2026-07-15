@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseCliArgs, validateArtifactFile, CliError, main } from "../src/cli.js";
+import { parseCliArgs, validateArtifactFile, CliError, main, openReview } from "../src/cli.js";
 
 describe("parseCliArgs", () => {
   test("parses --help with no file", () => {
@@ -65,23 +65,36 @@ describe("validateArtifactFile", () => {
 });
 
 describe("main", () => {
-  test("--help returns 0", () => {
-    assert.equal(main(["--help"]), 0);
+  test("--help returns 0", async () => {
+    assert.equal(await main(["--help"]), 0);
   });
 
-  test("no file argument returns non-zero", () => {
-    assert.notEqual(main([]), 0);
+  test("no file argument returns non-zero", async () => {
+    assert.notEqual(await main([]), 0);
   });
 
-  test("nonexistent file returns non-zero", () => {
-    assert.notEqual(main(["does-not-exist.html"]), 0);
+  test("nonexistent file returns non-zero", async () => {
+    assert.notEqual(await main(["does-not-exist.html"]), 0);
   });
 
-  test("existing html file returns 0", () => {
+  test("existing html file starts the server, prints the URL, and opens the browser", async () => {
     const dir = mkdtempSync(join(tmpdir(), "ai-review-board-cli-main-test-"));
     const file = join(dir, "demo.html");
     writeFileSync(file, "<html></html>");
-    assert.equal(main([file]), 0);
-    rmSync(dir, { recursive: true, force: true });
+
+    let openedUrl: string | undefined;
+    const handle = await openReview(file, {
+      openBrowser: (url) => {
+        openedUrl = url;
+      },
+    });
+
+    try {
+      assert.match(handle.url, /^http:\/\/127\.0\.0\.1:\d+\/$/);
+      assert.equal(openedUrl, handle.url);
+    } finally {
+      await handle.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
