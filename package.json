@@ -4,7 +4,7 @@
   "description": "Local-first human-in-the-loop review of agent-generated HTML artifacts.",
   "type": "module",
   "bin": {
-    "ai-review-board": "./dist/cli.js"
+    "ai-review-board": "./dist/src/cli.js"
   },
   "engines": {
     "node": ">=20"
