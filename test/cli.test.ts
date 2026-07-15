@@ -79,22 +79,26 @@ describe("main", () => {
 
   test("existing html file starts the server, prints the URL, and opens the browser", async () => {
     const dir = mkdtempSync(join(tmpdir(), "ai-review-board-cli-main-test-"));
+    const sessionRoot = mkdtempSync(join(tmpdir(), "ai-review-board-cli-main-session-"));
     const file = join(dir, "demo.html");
     writeFileSync(file, "<html></html>");
 
     let openedUrl: string | undefined;
-    const handle = await openReview(file, {
+    const result = await openReview(file, {
+      sessionRoot,
       openBrowser: (url) => {
         openedUrl = url;
       },
     });
 
     try {
-      assert.match(handle.url, /^http:\/\/127\.0\.0\.1:\d+\/$/);
-      assert.equal(openedUrl, handle.url);
+      assert.equal(result.reused, false);
+      assert.match(result.url, /^http:\/\/127\.0\.0\.1:\d+\/$/);
+      assert.equal(openedUrl, result.url);
     } finally {
-      await handle.close();
+      await result.handle?.close();
       rmSync(dir, { recursive: true, force: true });
+      rmSync(sessionRoot, { recursive: true, force: true });
     }
   });
 });

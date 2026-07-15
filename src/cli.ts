@@ -3,8 +3,8 @@ import { parseArgs } from "node:util";
 import { existsSync, statSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { startReviewServer, type ReviewServerHandle } from "./server.js";
 import { openInBrowser } from "./browser.js";
+import { openIdempotently, type IdempotentOpenOptions, type IdempotentOpenResult } from "./idempotent-open.js";
 
 export const USAGE = `Usage: ai-review-board <file.html>
 
@@ -48,15 +48,17 @@ export function validateArtifactFile(path: string): void {
   }
 }
 
-export interface OpenReviewDeps {
+export interface OpenReviewDeps extends IdempotentOpenOptions {
   openBrowser?: (url: string) => void;
 }
 
-export async function openReview(file: string, deps: OpenReviewDeps = {}): Promise<ReviewServerHandle> {
-  const handle = await startReviewServer({ artifactPath: file });
-  process.stdout.write(`${handle.url}\n`);
-  (deps.openBrowser ?? openInBrowser)(handle.url);
-  return handle;
+export async function openReview(file: string, deps: OpenReviewDeps = {}): Promise<IdempotentOpenResult> {
+  const result = await openIdempotently(file, deps);
+  process.stdout.write(`${result.url}\n`);
+  if (!result.reused) {
+    (deps.openBrowser ?? openInBrowser)(result.url);
+  }
+  return result;
 }
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {

@@ -90,6 +90,27 @@ export function listenOnAvailablePort(
   });
 }
 
+export interface HealthzInfo {
+  file: string;
+  pid: number;
+}
+
+export async function checkHealthz(baseUrl: string, timeoutMs = 500): Promise<HealthzInfo | undefined> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(new URL("/healthz", baseUrl), { signal: controller.signal });
+    if (!res.ok) {
+      return undefined;
+    }
+    return (await res.json()) as HealthzInfo;
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function startReviewServer(options: ReviewServerOptions): Promise<ReviewServerHandle> {
   const host = options.host ?? DEFAULT_HOST;
   const basePort = options.basePort ?? BASE_PORT;
