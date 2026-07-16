@@ -2,6 +2,7 @@ import { createServer as createHttpServer, type IncomingMessage, type ServerResp
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { renderShellPage } from "./shell.js";
+import { SseHub } from "./sse.js";
 
 export const DEFAULT_HOST = "127.0.0.1";
 export const BASE_PORT = 4400;
@@ -18,10 +19,11 @@ export interface ReviewServerHandle {
   port: number;
   host: string;
   url: string;
+  sseHub: SseHub;
   close(): Promise<void>;
 }
 
-export function createRequestHandler(artifactPath: string) {
+export function createRequestHandler(artifactPath: string, sseHub: SseHub) {
   const absoluteArtifactPath = resolve(artifactPath);
 
   return function handler(req: IncomingMessage, res: ServerResponse): void {
@@ -50,6 +52,22 @@ export function createRequestHandler(artifactPath: string) {
       const body = JSON.stringify({ file: absoluteArtifactPath, pid: process.pid });
       res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
       res.end(body);
+      return;
+    }
+
+    if (pathname === "/events" && req.method === "GET") {
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+      res.write(":ok\n\n");
+      sseHub.register(res);
+      const cleanup = (): void => {
+        sseHub.unregister(res);
+      };
+      req.on("close", cleanup);
+      res.on("error", cleanup);
       return;
     }
 
@@ -114,7 +132,8 @@ export async function checkHealthz(baseUrl: string, timeoutMs = 500): Promise<He
 export async function startReviewServer(options: ReviewServerOptions): Promise<ReviewServerHandle> {
   const host = options.host ?? DEFAULT_HOST;
   const basePort = options.basePort ?? BASE_PORT;
-  const handler = createRequestHandler(options.artifactPath);
+  const sseHub = new SseHub();
+  const handler = createRequestHandler(options.artifactPath, sseHub);
   const server = createHttpServer(handler);
   const port = await listenOnAvailablePort(server, host, basePort);
 
@@ -123,6 +142,7 @@ export async function startReviewServer(options: ReviewServerOptions): Promise<R
     port,
     host,
     url: `http://${host}:${port}/`,
+    sseHub,
     close(): Promise<void> {
       return new Promise((resolvePromise, reject) => {
         server.close((err) => (err ? reject(err) : resolvePromise()));
