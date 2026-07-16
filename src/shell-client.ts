@@ -241,7 +241,12 @@ export function renderClientScript(): string {
 
     var style = doc.createElement("style");
     style.textContent =
-      "::highlight(" + HIGHLIGHT_NAME + ") { background-color: rgba(255,204,0,.35); }" +
+      // At rest: a neutral gray wash — just enough to mark "this text has an
+      // annotation" without fighting for attention. On hover: the warmer
+      // yellow, so the color itself changes (not just its opacity), giving
+      // a clearer "you're now pointing at this one" signal than deepening
+      // the same hue would.
+      "::highlight(" + HIGHLIGHT_NAME + ") { background-color: rgba(60,64,72,.12); }" +
       "::highlight(" + HIGHLIGHT_HOVER_NAME + ") { background-color: rgba(255,204,0,.6); }";
     doc.head.appendChild(style);
 
