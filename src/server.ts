@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { renderShellPage } from "./shell.js";
 import { SseHub } from "./sse.js";
+import { watchArtifactFile } from "./watcher.js";
 
 export const DEFAULT_HOST = "127.0.0.1";
 export const BASE_PORT = 4400;
@@ -137,6 +138,10 @@ export async function startReviewServer(options: ReviewServerOptions): Promise<R
   const server = createHttpServer(handler);
   const port = await listenOnAvailablePort(server, host, basePort);
 
+  const watcherHandle = watchArtifactFile(options.artifactPath, () => {
+    sseHub.broadcast("reload", { timestamp: Date.now() });
+  });
+
   return {
     server,
     port,
@@ -144,6 +149,7 @@ export async function startReviewServer(options: ReviewServerOptions): Promise<R
     url: `http://${host}:${port}/`,
     sseHub,
     close(): Promise<void> {
+      watcherHandle.close();
       return new Promise((resolvePromise, reject) => {
         server.close((err) => (err ? reject(err) : resolvePromise()));
       });
