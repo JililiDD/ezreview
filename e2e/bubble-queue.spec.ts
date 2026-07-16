@@ -101,12 +101,8 @@ test("two queued bubbles with close anchors stack without overlapping", async ({
   expect(noOverlap).toBe(true);
 });
 
-test("Send all is a placeholder: no network request, no state change", async ({ page }) => {
+test("clicking Send all with an empty queue does not submit anything (edge case)", async ({ page }) => {
   await page.goto(handle.url);
-  const frame = page.frameLocator("#artifact-frame");
-  await frame.locator("#near-top").click();
-  await page.locator(".bubble-draft textarea").fill("x");
-  await page.locator(".bubble-draft .bubble-add").click();
 
   let feedbackRequestSeen = false;
   page.on("request", (req) => {
@@ -117,6 +113,8 @@ test("Send all is a placeholder: no network request, no state change", async ({ 
   await page.waitForTimeout(200);
 
   expect(feedbackRequestSeen).toBe(false);
-  await expect(page.locator(".bubble")).toHaveCount(1);
-  await expect(page.locator("#send-all")).toHaveText("Send all (1)");
 });
+
+// Real Send-all submission + Sent/History bubble states are covered in
+// e2e/send-all.spec.ts (Phase 5) — this file stays focused on the
+// draft->queue->delete mechanics established in Phase 3.

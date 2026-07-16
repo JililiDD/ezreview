@@ -23,6 +23,7 @@ export function renderClientScript(): string {
     currentHoverTarget = null;
     hideHighlight();
     markTextAnnotationsLost();
+    moveSentItemsIntoHistory();
     if (pendingSelectionRange || draftBubble) {
       hideAddCommentButton();
       closeDraftBubble();
@@ -281,6 +282,64 @@ export function renderClientScript(): string {
   window.__annotationQueue = queue;
   var draftBubble = null;
   var nextQueueId = 1;
+  var sentItems = [];
+  window.__sentAnnotations = sentItems;
+  var historyItems = [];
+  var historyExpanded = false;
+
+  var historyContainer = document.createElement("div");
+  historyContainer.id = "history-group";
+  historyContainer.style.position = "fixed";
+  historyContainer.style.top = "48px";
+  historyContainer.style.right = "12px";
+  historyContainer.style.width = "250px";
+  historyContainer.style.display = "none";
+  historyContainer.style.zIndex = "890";
+  document.body.appendChild(historyContainer);
+
+  var historyHeader = document.createElement("div");
+  historyHeader.id = "history-header";
+  historyHeader.style.background = "#fff";
+  historyHeader.style.border = "1px solid #e3e5e9";
+  historyHeader.style.borderRadius = "8px";
+  historyHeader.style.padding = "8px 12px";
+  historyHeader.style.cursor = "pointer";
+  historyHeader.style.fontSize = "13px";
+  historyHeader.style.boxSizing = "border-box";
+  historyContainer.appendChild(historyHeader);
+
+  var historyList = document.createElement("div");
+  historyList.id = "history-list";
+  historyList.style.marginTop = "8px";
+  historyContainer.appendChild(historyList);
+
+  function renderHistoryGroup() {
+    historyHeader.textContent = "Processed (" + historyItems.length + ")";
+    historyContainer.style.display = historyItems.length > 0 ? "block" : "none";
+    historyList.style.display = historyExpanded ? "block" : "none";
+  }
+
+  historyHeader.addEventListener("click", function () {
+    historyExpanded = !historyExpanded;
+    renderHistoryGroup();
+  });
+
+  function moveSentItemsIntoHistory() {
+    if (sentItems.length === 0) return;
+    for (var i = 0; i < sentItems.length; i++) {
+      var item = sentItems[i];
+      item.node.style.position = "static";
+      item.node.style.top = "auto";
+      item.node.style.right = "auto";
+      item.node.style.width = "auto";
+      item.node.style.marginBottom = "8px";
+      historyList.appendChild(item.node);
+      historyItems.push(item);
+    }
+    sentItems.length = 0;
+    renderHistoryGroup();
+    layoutBubbles();
+  }
 
   function updateSendAllLabel() {
     sendAllButton.textContent = "Send all (" + queue.length + ")";
@@ -302,7 +361,8 @@ export function renderClientScript(): string {
     all.sort(function (a, b) {
       return a.anchorY - b.anchorY;
     });
-    var cursor = 48;
+    var historyHeight = historyItems.length > 0 ? historyContainer.offsetHeight + 8 : 0;
+    var cursor = 48 + historyHeight;
     for (var i = 0; i < all.length; i++) {
       var top = Math.max(all[i].anchorY, cursor);
       all[i].node.style.top = top + "px";
@@ -623,9 +683,82 @@ export function renderClientScript(): string {
     layoutBubbles();
   }
 
+  function truncateText(text, max) {
+    return text.length > max ? text.slice(0, max) + "…" : text;
+  }
+
+  function buildSubmissionPayload() {
+    return queue.map(function (item) {
+      if (item.type === "text-annotation") {
+        return {
+          id: item.id,
+          type: "text-annotation",
+          selectedText: item.selectedText,
+          context: item.context,
+          nearestSelector: item.nearestSelector,
+          shadowHost: item.shadowHost,
+          comment: item.comment,
+        };
+      }
+      var outerHTML = item.target && item.target.outerHTML ? truncateText(item.target.outerHTML, 500) : "";
+      return {
+        id: item.id,
+        type: "element-annotation",
+        selector: item.selector,
+        shadowHost: item.shadowHost,
+        outerHTML: outerHTML,
+        comment: item.comment,
+      };
+    });
+  }
+
+  function markBubbleSent(node) {
+    var deleteBtn = node.querySelector(".bubble-delete");
+    if (deleteBtn) deleteBtn.remove();
+    node.classList.add("bubble-sent");
+    node.style.background = "#f2f2f2";
+    var badge = document.createElement("span");
+    badge.className = "sent-badge";
+    badge.textContent = "✓ Sent · awaiting agent edits";
+    badge.style.display = "inline-block";
+    badge.style.marginTop = "4px";
+    badge.style.fontSize = "11px";
+    badge.style.color = "#555";
+    node.appendChild(badge);
+  }
+
+  function showSendFailure(message) {
+    statusText.textContent = message;
+    window.setTimeout(function () {
+      if (dot.classList.contains("disconnected")) return;
+      statusText.textContent = "";
+    }, 3000);
+  }
+
   sendAllButton.addEventListener("click", function () {
-    // Placeholder for this phase: no network request, no state change.
-    // Real submission wiring lands in Phase 5.
+    if (queue.length === 0) return;
+    var payload = buildSubmissionPayload();
+    fetch("/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          showSendFailure("Send failed — please retry");
+          return;
+        }
+        for (var i = 0; i < queue.length; i++) {
+          markBubbleSent(queue[i].node);
+          sentItems.push(queue[i]);
+        }
+        queue.length = 0;
+        updateSendAllLabel();
+        layoutBubbles();
+      })
+      .catch(function () {
+        showSendFailure("Send failed — network error");
+      });
   });
 
   function onIframeClick(e) {
