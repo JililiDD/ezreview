@@ -159,12 +159,17 @@ function isMainModule(): boolean {
 if (isMainModule()) {
   main()
     .then((exitCode) => {
-      if (exitCode !== 0) {
-        process.exit(exitCode);
-      }
+      // Set exitCode and let Node drain the event loop naturally instead of
+      // calling process.exit() — a forced exit immediately after a network
+      // error response (e.g. reply's non-ok /reply POST) can race undici's
+      // socket teardown on Windows and crash with a libuv assertion
+      // ("UV_HANDLE_CLOSING"). Only the `open` path keeps the process alive
+      // deliberately (its own open server handle); every other path has no
+      // reason to exit before its own pending I/O finishes on its own.
+      process.exitCode = exitCode;
     })
     .catch((err: Error) => {
       process.stderr.write(`Error: ${err.message}\n`);
-      process.exit(1);
+      process.exitCode = 1;
     });
 }

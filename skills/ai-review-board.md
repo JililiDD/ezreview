@@ -6,9 +6,9 @@ This document assumes no prior knowledge of the tool beyond what's written here.
 
 ## The three commands
 
-### `ai-review-board <file.html>` — open a review session
+### `ai-review-board <file.html>` (no subcommand) — open a review session
 
-Starts a local server, opens the artifact in the reviewer's browser, and prints the URL to stdout.
+Starts a local server, opens the artifact in the reviewer's browser, and prints the URL to stdout. There is no `open` subcommand — just pass the file path directly as the only argument, as shown below.
 
 ```
 ai-review-board report.html
@@ -30,7 +30,7 @@ ai-review-board wait report.html
 - **If your shell/host kills `wait` due to a command timeout, just run it again.** Feedback is durably queued server-side and consumed exactly once per `wait` call; a killed-and-rerun `wait` will still return the next unconsumed batch, never a duplicate and never a gap. Do not build your own retry/backoff logic around this — a plain rerun is the correct and complete recovery.
 - Each annotation in the output has a stable id (e.g. `a-3`), an element `selector` and (truncated) `outerHTML` for element annotations, or `selectedText`/surrounding `context` for text-selection annotations, and the reviewer's `comment`. Use the id when replying (see below).
 - If there is no running session for the file (you haven't called `open` yet, or the server has since auto-exited), `wait` fails immediately with a clear error instead of hanging — run `open` first.
-- Annotation ids and "has this been answered" state live only in the server process's memory — they do **not** survive an idle auto-exit + restart. This is normal, not a bug: if `reply` ever fails with an "unknown annotation id" error where you expected "already answered" instead, the session likely restarted since you last saw that id; just re-run `wait` to get current, valid ids rather than reusing old ones from your own notes.
+- Annotation ids and "has this been answered" state are durable — they survive an idle auto-exit + restart, so an id from an old `wait` batch is still valid to `reply` to even if the session restarted in between.
 
 ### `ai-review-board reply <file.html> --to <id> "<answer text>"` — answer a question
 

@@ -5,7 +5,7 @@ import { renderShellPage } from "./shell.js";
 import { SseHub } from "./sse.js";
 import { watchArtifactFile } from "./watcher.js";
 import { watchForIdle, DEFAULT_IDLE_TIMEOUT_MS } from "./idle-exit.js";
-import { appendBatch } from "./feedback-queue.js";
+import { appendBatch, loadSubmittedIds, loadAnsweredIds, recordAnsweredId } from "./feedback-queue.js";
 import { sessionDirFor } from "./session.js";
 
 export const DEFAULT_HOST = "127.0.0.1";
@@ -47,8 +47,11 @@ function readJsonBody(req: IncomingMessage): Promise<unknown> {
 
 export function createRequestHandler(artifactPath: string, sseHub: SseHub, sessionDir: string) {
   const absoluteArtifactPath = resolve(artifactPath);
-  const submittedIds = new Set<string>();
-  const answeredIds = new Set<string>();
+  // Seeded from disk (not empty) so ids submitted in a prior server process —
+  // including ones already consumed by `wait` before this process started —
+  // remain valid to reply to across an idle-exit restart.
+  const submittedIds = loadSubmittedIds(sessionDir);
+  const answeredIds = loadAnsweredIds(sessionDir);
 
   return function handler(req: IncomingMessage, res: ServerResponse): void {
     const pathname = (req.url ?? "/").split("?")[0];
@@ -145,6 +148,7 @@ export function createRequestHandler(artifactPath: string, sseHub: SseHub, sessi
             return;
           }
           answeredIds.add(id);
+          recordAnsweredId(sessionDir, id);
           sseHub.broadcast("reply", { id, text });
           res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
           res.end(JSON.stringify({ ok: true }));

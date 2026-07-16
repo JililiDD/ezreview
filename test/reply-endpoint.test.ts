@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startReviewServer } from "../src/server.js";
+import { appendBatch, consumeNextBatch } from "../src/feedback-queue.js";
 import type { ReviewServerHandle } from "../src/server.js";
 
 async function postFeedback(handle: ReviewServerHandle, items: unknown[]): Promise<Response> {
@@ -85,5 +86,39 @@ describe("POST /reply", () => {
       body: JSON.stringify({ id: "a-1" }),
     });
     assert.equal(res.status, 400);
+  });
+
+  test("replying to an id that survived a server restart between submission and reply succeeds (AC: submittedIds durability)", async () => {
+    // Regression for a real Phase 6 E2E bug: an id appended to the queue by
+    // one server process (here, standing in for a batch that reached the
+    // queue any way other than a live /feedback POST — e.g. `wait` consuming
+    // it, or the queue simply predating the current process), consumed by
+    // `wait`, then replied to only after a *fresh* server process starts on
+    // the same session dir, must still be recognized as a valid id — not
+    // rejected as "unknown annotation id" just because the new process's
+    // in-memory bookkeeping starts empty.
+    const restartDir = mkdtempSync(join(tmpdir(), "ai-review-board-reply-restart-test-"));
+    const restartArtifact = join(restartDir, "demo.html");
+    writeFileSync(restartArtifact, "<html></html>");
+    const sessionDir = join(restartDir, "session");
+
+    try {
+      appendBatch(sessionDir, [{ id: "a-restart-1", comment: "does this survive a restart?" }]);
+      consumeNextBatch(sessionDir); // simulates `wait` picking it up
+
+      const restartedHandle = await startReviewServer({
+        artifactPath: restartArtifact,
+        basePort: 5950,
+        sessionDir,
+      });
+      try {
+        const res = await postReply(restartedHandle, "a-restart-1", "yes, it does now");
+        assert.equal(res.status, 200, `expected 200, got ${res.status}: ${await res.text()}`);
+      } finally {
+        await restartedHandle.close();
+      }
+    } finally {
+      rmSync(restartDir, { recursive: true, force: true });
+    }
   });
 });
