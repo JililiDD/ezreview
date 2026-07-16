@@ -190,3 +190,39 @@ test("a text annotation queued before a reload is marked lost after the reload",
     rmSync(localDir, { recursive: true, force: true });
   }
 });
+
+test("a text annotation that was already Sent before a reload is also marked lost on hover (not silently inert)", async ({ page }) => {
+  // Regression: markTextAnnotationsLost() previously only scanned the queue,
+  // so a text annotation already moved into sentItems by Send all kept
+  // lost === false forever. Its Range still pointed at the pre-reload
+  // iframe document, so hovering it neither highlighted anything (the
+  // Range's nodes are gone) nor showed the Anchor lost badge — a silent,
+  // confusing dead end a real reviewer hit manually.
+  const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-text-sent-reload-e2e-"));
+  const localArtifact = join(localDir, "demo.html");
+  copyFileSync(join(import.meta.dirname, "fixtures", "text-selection.html"), localArtifact);
+  const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5520 });
+
+  try {
+    await page.goto(localHandle.url);
+    await selectSubstring(page, "#para", "testing text selection");
+    await queueCurrentSelection(page, "x");
+
+    await page.locator("#send-all").click();
+    await expect(page.locator(".bubble .sent-badge")).toBeVisible();
+
+    writeFileSync(localArtifact, "<html><body><p>totally different</p></body></html>");
+    await page.waitForTimeout(1200);
+
+    // The reload also moves the now-Sent bubble into the collapsed
+    // "Processed" history group — expand it before hovering.
+    await page.locator("#history-header").click();
+
+    const bubble = page.locator(".bubble");
+    await bubble.hover();
+    await expect(bubble.locator(".anchor-lost-badge")).toBeVisible();
+  } finally {
+    await localHandle.close();
+    rmSync(localDir, { recursive: true, force: true });
+  }
+});

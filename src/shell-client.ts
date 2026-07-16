@@ -492,9 +492,21 @@ export function renderClientScript(): string {
   }
 
   function markTextAnnotationsLost() {
-    for (var i = 0; i < queue.length; i++) {
-      if (queue[i].type === "text-annotation") {
-        queue[i].lost = true;
+    // sentItems too, not just queue: a text annotation's Range is bound to
+    // the pre-reload iframe document, so it goes stale the moment this
+    // reload's frame.src reassignment replaces that document — regardless
+    // of whether the annotation is still queued or has already been sent.
+    // historyItems don't need their own pass here: an item only reaches
+    // historyItems via moveSentItemsIntoHistory, which this same reload
+    // handler runs right after this function — so by the time an item
+    // enters historyItems, it has already been marked lost while still in
+    // sentItems on that same reload.
+    var lists = [queue, sentItems];
+    for (var l = 0; l < lists.length; l++) {
+      for (var i = 0; i < lists[l].length; i++) {
+        if (lists[l][i].type === "text-annotation") {
+          lists[l][i].lost = true;
+        }
       }
     }
   }
