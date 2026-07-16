@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { openInBrowser } from "./browser.js";
 import { openIdempotently, type IdempotentOpenOptions, type IdempotentOpenResult } from "./idempotent-open.js";
 import { waitForFeedback, WaitError } from "./wait.js";
+import { sendReply, ReplyError } from "./reply.js";
 
 export const USAGE = `Usage:
   ai-review-board <file.html>                          Open a review server
@@ -137,9 +138,17 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     }
   }
 
-  // reply subcommand: wired in a later story (US4).
-  process.stderr.write("Error: reply is not yet implemented\n");
-  return 1;
+  try {
+    await sendReply(parsed.file, parsed.to, parsed.text);
+    process.stdout.write(`Reply sent to ${parsed.to}.\n`);
+    return 0;
+  } catch (err) {
+    if (err instanceof ReplyError) {
+      process.stderr.write(`Error: ${err.message}\n`);
+      return 1;
+    }
+    throw err;
+  }
 }
 
 function isMainModule(): boolean {

@@ -47,6 +47,8 @@ function readJsonBody(req: IncomingMessage): Promise<unknown> {
 
 export function createRequestHandler(artifactPath: string, sseHub: SseHub, sessionDir: string) {
   const absoluteArtifactPath = resolve(artifactPath);
+  const submittedIds = new Set<string>();
+  const answeredIds = new Set<string>();
 
   return function handler(req: IncomingMessage, res: ServerResponse): void {
     const pathname = (req.url ?? "/").split("?")[0];
@@ -104,7 +106,46 @@ export function createRequestHandler(artifactPath: string, sseHub: SseHub, sessi
             return;
           }
           appendBatch(sessionDir, body as unknown[]);
+          for (const item of body as Array<{ id: unknown }>) {
+            submittedIds.add(String(item.id));
+          }
           sseHub.broadcast("feedback", {});
+          res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ ok: true }));
+        })
+        .catch(() => {
+          res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ error: "invalid JSON body" }));
+        });
+      return;
+    }
+
+    if (pathname === "/reply" && req.method === "POST") {
+      readJsonBody(req)
+        .then((body) => {
+          const isValid =
+            !!body &&
+            typeof body === "object" &&
+            typeof (body as { id?: unknown }).id === "string" &&
+            typeof (body as { text?: unknown }).text === "string";
+          if (!isValid) {
+            res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ error: "expected { id: string, text: string }" }));
+            return;
+          }
+          const { id, text } = body as { id: string; text: string };
+          if (!submittedIds.has(id)) {
+            res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ error: `unknown annotation id: ${id}` }));
+            return;
+          }
+          if (answeredIds.has(id)) {
+            res.writeHead(409, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ error: `annotation ${id} has already been answered` }));
+            return;
+          }
+          answeredIds.add(id);
+          sseHub.broadcast("reply", { id, text });
           res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
           res.end(JSON.stringify({ ok: true }));
         })

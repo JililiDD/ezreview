@@ -36,6 +36,13 @@ export function renderClientScript(): string {
     frame.src = "/artifact?t=" + Date.now();
   });
 
+  source.addEventListener("reply", function (e) {
+    var data = JSON.parse(e.data);
+    var node = findAnnotationNodeById(data.id);
+    if (!node || node.querySelector(".answer-block")) return;
+    renderAnswer(node, data.text);
+  });
+
   // ---- Selector generator (self-authored, D-001) ----
 
   function cssEscape(value) {
@@ -383,6 +390,52 @@ export function renderClientScript(): string {
     } catch (e) {
       return null;
     }
+  }
+
+  function findAnnotationNodeById(id) {
+    var lists = [sentItems, historyItems, queue];
+    for (var i = 0; i < lists.length; i++) {
+      for (var j = 0; j < lists[i].length; j++) {
+        if (lists[i][j].id === id) return lists[i][j].node;
+      }
+    }
+    return null;
+  }
+
+  function renderAnswer(node, text) {
+    var answerBlock = document.createElement("div");
+    answerBlock.className = "answer-block";
+    answerBlock.style.marginTop = "6px";
+    answerBlock.style.paddingLeft = "8px";
+    answerBlock.style.borderLeft = "3px solid var(--accent)";
+    answerBlock.style.background = "#f4f8fe";
+
+    var agentLabel = document.createElement("div");
+    agentLabel.className = "agent-label";
+    agentLabel.textContent = "AGENT";
+    agentLabel.style.fontSize = "10px";
+    agentLabel.style.fontWeight = "bold";
+    agentLabel.style.color = "var(--accent)";
+    answerBlock.appendChild(agentLabel);
+
+    var answerText = document.createElement("div");
+    answerText.className = "answer-text";
+    answerText.textContent = text;
+    answerBlock.appendChild(answerText);
+
+    node.appendChild(answerBlock);
+
+    var answeredBadge = document.createElement("span");
+    answeredBadge.className = "answered-badge";
+    answeredBadge.textContent = "✓ Answered";
+    answeredBadge.style.display = "inline-block";
+    answeredBadge.style.marginTop = "4px";
+    answeredBadge.style.padding = "1px 6px";
+    answeredBadge.style.borderRadius = "4px";
+    answeredBadge.style.fontSize = "11px";
+    answeredBadge.style.color = "#1d7a45";
+    answeredBadge.style.background = "#e2f5ea";
+    node.appendChild(answeredBadge);
   }
 
   function setAnchorLost(node, lost) {
