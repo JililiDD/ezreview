@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const QUEUE_FILENAME = "feedback-queue.jsonl";
@@ -21,7 +21,12 @@ export function consumeNextBatch(sessionDir: string): unknown[] | null {
   if (rest.length === 0) {
     unlinkSync(path);
   } else {
-    writeFileSync(path, rest.join("\n") + "\n");
+    // Write-then-rename instead of an in-place rewrite: a concurrent reader
+    // (the server process appending a new batch) can only ever observe the
+    // old file or the fully-written new one, never a partially-written one.
+    const tmpPath = `${path}.${process.pid}.tmp`;
+    writeFileSync(tmpPath, rest.join("\n") + "\n");
+    renameSync(tmpPath, path);
   }
   return JSON.parse(first) as unknown[];
 }
