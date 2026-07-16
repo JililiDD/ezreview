@@ -42,7 +42,8 @@ async function selectWholeElement(page: import("@playwright/test").Page, element
 }
 
 async function queueCurrentSelection(page: import("@playwright/test").Page, comment: string) {
-  await page.locator("#add-comment-button").click();
+  // Selecting text opens the draft bubble directly now — no intermediate
+  // "+ Add comment" button to click first.
   await page.locator(".bubble-draft textarea").fill(comment);
   await page.locator(".bubble-draft .bubble-add").click();
 }
@@ -63,10 +64,9 @@ test.afterAll(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-test("clicking + Add comment opens a draft bubble carrying the selected text", async ({ page }) => {
+test("selecting text opens a draft bubble carrying the selected text", async ({ page }) => {
   await page.goto(handle.url);
   await selectSubstring(page, "#para", "testing text selection");
-  await page.locator("#add-comment-button").click();
 
   await expect(page.locator(".bubble-draft")).toBeVisible();
 });
@@ -125,7 +125,6 @@ test("the queued text annotation gets a Custom Highlight registered in the ifram
 test("Cancel removes the preview highlight without queueing anything", async ({ page }) => {
   await page.goto(handle.url);
   await selectSubstring(page, "#para", "testing text selection");
-  await page.locator("#add-comment-button").click();
   await page.locator(".bubble-draft .bubble-cancel").click();
 
   const size = await page.evaluate(() => {

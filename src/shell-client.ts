@@ -29,8 +29,7 @@ export function renderClientScript(): string {
     hideHighlight();
     markTextAnnotationsLost();
     moveSentItemsIntoHistory();
-    if (pendingSelectionRange || draftBubble) {
-      hideAddCommentButton();
+    if (draftBubble) {
       closeDraftBubble();
       statusText.textContent = "Selection cleared — please reselect";
       window.setTimeout(function () {
@@ -247,7 +246,7 @@ export function renderClientScript(): string {
       // a clearer "you're now pointing at this one" signal than deepening
       // the same hue would.
       "::highlight(" + HIGHLIGHT_NAME + ") { background-color: rgba(60,64,72,.12); }" +
-      "::highlight(" + HIGHLIGHT_HOVER_NAME + ") { background-color: rgba(255,204,0,.6); }";
+      "::highlight(" + HIGHLIGHT_HOVER_NAME + ") { background-color: rgba(255,204,0,.8); }";
     doc.head.appendChild(style);
 
     textHighlightSet = new win.Highlight();
@@ -256,51 +255,13 @@ export function renderClientScript(): string {
     win.CSS.highlights.set(HIGHLIGHT_HOVER_NAME, textHighlightHoverSet);
   }
 
-  var addCommentButton = document.createElement("button");
-  addCommentButton.id = "add-comment-button";
-  addCommentButton.textContent = "+ Add comment";
-  addCommentButton.style.position = "fixed";
-  addCommentButton.style.background = "var(--chrome-bg)";
-  addCommentButton.style.color = "#fff";
-  addCommentButton.style.border = "none";
-  addCommentButton.style.borderRadius = "6px";
-  addCommentButton.style.padding = "6px 10px";
-  addCommentButton.style.fontSize = "12.5px";
-  addCommentButton.style.cursor = "pointer";
-  addCommentButton.style.zIndex = "1002";
-  addCommentButton.style.display = "none";
-  document.body.appendChild(addCommentButton);
-
-  var pendingSelectionRange = null;
-
-  function hideAddCommentButton() {
-    addCommentButton.style.display = "none";
-    pendingSelectionRange = null;
-  }
-
-  function showAddCommentButton(range) {
-    var rect = range.getBoundingClientRect();
-    var frameRect = frame.getBoundingClientRect();
-    addCommentButton.style.left = frameRect.left + rect.right - 120 + "px";
-    addCommentButton.style.top = frameRect.top + rect.top - 28 + "px";
-    addCommentButton.style.display = "block";
-    pendingSelectionRange = range;
-  }
-
   function onIframeMouseUp() {
     var doc = getIframeDoc();
     var sel = doc && doc.getSelection ? doc.getSelection() : null;
     if (sel && sel.toString().length > 0 && sel.rangeCount > 0) {
-      showAddCommentButton(sel.getRangeAt(0).cloneRange());
-    } else {
-      hideAddCommentButton();
+      openTextDraftBubble(sel.getRangeAt(0).cloneRange());
     }
   }
-
-  addCommentButton.addEventListener("click", function () {
-    if (pendingSelectionRange) openTextDraftBubble(pendingSelectionRange);
-    hideAddCommentButton();
-  });
 
   function attachSelectionListeners() {
     var doc = getIframeDoc();
@@ -556,7 +517,10 @@ export function renderClientScript(): string {
     node.style.marginBottom = "8px";
     node.style.position = "fixed";
     node.style.width = "260px";
-    node.style.zIndex = "900";
+    // Above highlightBox's z-index (1000) — a floating draft opened right
+    // where the hover highlight box currently sits must never be covered by
+    // it.
+    node.style.zIndex = "1100";
     document.body.appendChild(node);
     return node;
   }

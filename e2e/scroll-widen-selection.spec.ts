@@ -105,3 +105,17 @@ test("the scroll hint in the toolbar is visible only while Review is on", async 
   await page.locator("#review-switch").click();
   await expect(hint).toBeVisible();
 });
+
+test("toggling Review does not move the Review toggle itself — the hint reserves its own space either way", async ({ page }) => {
+  await page.goto(handle.url);
+  const toggle = page.locator("#review-toggle");
+  const boxBefore = await toggle.boundingBox();
+
+  await page.locator("#review-switch").click(); // Review off, hint hidden
+  const boxOff = await toggle.boundingBox();
+  expect(boxOff!.x).toBeCloseTo(boxBefore!.x, 0);
+
+  await page.locator("#review-switch").click(); // Review on, hint visible again
+  const boxOn = await toggle.boundingBox();
+  expect(boxOn!.x).toBeCloseTo(boxBefore!.x, 0);
+});

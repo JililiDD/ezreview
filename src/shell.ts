@@ -102,10 +102,15 @@ export function renderShellPage(): string {
   #scroll-hint {
     color: var(--chrome-dim);
     font-size: 11.5px;
-    display: none;
+    /* visibility, not display: the review toggle's own position must never
+       shift when this shows/hides — its box stays reserved either way. */
+    visibility: hidden;
   }
   #scroll-hint.visible {
-    display: inline;
+    visibility: visible;
+  }
+  #spacer-2 {
+    flex: 1;
   }
   #send-all {
     background: var(--accent);
@@ -188,6 +193,7 @@ export function renderShellPage(): string {
       <span class="switch" id="review-switch" data-on="true"><span class="switch-knob"></span></span>
     </div>
     <span id="scroll-hint">Scroll while hovering to widen the selection</span>
+    <div id="spacer-2"></div>
     <button id="send-all">Send all (0)</button>
   </div>
   <div id="stage">

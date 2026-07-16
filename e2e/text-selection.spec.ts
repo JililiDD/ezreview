@@ -19,15 +19,6 @@ async function selectWholeElementText(page: import("@playwright/test").Page, ifr
   }, iframeSelector);
 }
 
-async function clearSelectionAndMouseUp(page: import("@playwright/test").Page) {
-  await page.evaluate(() => {
-    const frame = document.getElementById("artifact-frame") as HTMLIFrameElement;
-    const doc = frame.contentDocument!;
-    doc.getSelection()!.removeAllRanges();
-    doc.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-  });
-}
-
 let dir: string;
 let artifactPath: string;
 let handle: ReviewServerHandle;
@@ -44,51 +35,51 @@ test.afterAll(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-test("selecting text shows the + Add comment button, Review on", async ({ page }) => {
+test("selecting text opens the draft comment bubble directly, Review on", async ({ page }) => {
   await page.goto(handle.url);
   await expect(page.locator("#review-switch")).toHaveAttribute("data-on", "true");
 
   await selectWholeElementText(page, "#mid-span");
 
-  await expect(page.locator("#add-comment-button")).toBeVisible();
+  await expect(page.locator(".bubble-draft")).toBeVisible();
+  await expect(page.locator(".bubble-draft textarea")).toBeFocused();
 });
 
-test("selecting text shows the + Add comment button even with Review off", async ({ page }) => {
+test("selecting text opens the draft comment bubble even with Review off", async ({ page }) => {
   await page.goto(handle.url);
   await page.locator("#review-switch").click();
   await expect(page.locator("#review-switch")).toHaveAttribute("data-on", "false");
 
   await selectWholeElementText(page, "#mid-span");
 
-  await expect(page.locator("#add-comment-button")).toBeVisible();
+  await expect(page.locator(".bubble-draft")).toBeVisible();
 });
 
-test("clearing the selection hides the button", async ({ page }) => {
+test("selecting a new span while a draft is already open replaces it with a fresh draft", async ({ page }) => {
   await page.goto(handle.url);
   await selectWholeElementText(page, "#mid-span");
-  await expect(page.locator("#add-comment-button")).toBeVisible();
+  await expect(page.locator(".bubble-draft")).toHaveCount(1);
 
-  await clearSelectionAndMouseUp(page);
-
-  await expect(page.locator("#add-comment-button")).not.toBeVisible();
+  await selectWholeElementText(page, "#mid-span");
+  await expect(page.locator(".bubble-draft")).toHaveCount(1);
 });
 
-test("the button is positioned near the selection's bounding box", async ({ page }) => {
+test("the draft bubble is positioned near the selection's bounding box", async ({ page }) => {
   await page.goto(handle.url);
   const frame = page.frameLocator("#artifact-frame");
   await selectWholeElementText(page, "#mid-span");
 
-  const button = page.locator("#add-comment-button");
-  await expect(button).toBeVisible();
-  const buttonBox = await button.boundingBox();
+  const draft = page.locator(".bubble-draft");
+  await expect(draft).toBeVisible();
+  const draftBox = await draft.boundingBox();
   const spanBox = await frame.locator("#mid-span").boundingBox();
-  expect(buttonBox).not.toBeNull();
+  expect(draftBox).not.toBeNull();
   expect(spanBox).not.toBeNull();
-  // button should be roughly above/near the selection, not somewhere unrelated
-  expect(Math.abs(buttonBox!.y - spanBox!.y)).toBeLessThan(60);
+  // draft should be roughly below/near the selection, not somewhere unrelated
+  expect(Math.abs(draftBox!.y - spanBox!.y)).toBeLessThan(80);
 });
 
-test("a live-reload while the button is showing hides it and shows a reselect hint", async ({ page }) => {
+test("a live-reload while a text-selection draft is open closes it and shows a reselect hint", async ({ page }) => {
   const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-text-sel-reload-e2e-"));
   const localArtifact = join(localDir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "text-selection.html"), localArtifact);
@@ -97,11 +88,11 @@ test("a live-reload while the button is showing hides it and shows a reselect hi
   try {
     await page.goto(localHandle.url);
     await selectWholeElementText(page, "#mid-span");
-    await expect(page.locator("#add-comment-button")).toBeVisible();
+    await expect(page.locator(".bubble-draft")).toBeVisible();
 
     writeFileSync(localArtifact, "<html><body><p>reloaded content</p></body></html>");
 
-    await expect(page.locator("#add-comment-button")).not.toBeVisible({ timeout: 3000 });
+    await expect(page.locator(".bubble-draft")).not.toBeVisible({ timeout: 3000 });
     await expect(page.locator("#status-text")).toHaveText("Selection cleared — please reselect");
   } finally {
     await localHandle.close();
