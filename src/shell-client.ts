@@ -177,6 +177,161 @@ export function renderClientScript(): string {
     hideHighlight();
   }
 
+  // ---- Bubble queue (draft -> queue -> delete; Send all is a placeholder) ----
+
+  var sendAllButton = document.getElementById("send-all");
+  var queue = [];
+  var draftBubble = null;
+  var nextQueueId = 1;
+
+  function updateSendAllLabel() {
+    sendAllButton.textContent = "Send all (" + queue.length + ")";
+  }
+
+  function targetAnchorY(target) {
+    var rect = target.getBoundingClientRect();
+    var frameRect = frame.getBoundingClientRect();
+    return frameRect.top + rect.top;
+  }
+
+  function layoutBubbles() {
+    var all = queue.map(function (q) {
+      return { node: q.node, anchorY: q.anchorY };
+    });
+    if (draftBubble) {
+      all.push({ node: draftBubble.node, anchorY: draftBubble.anchorY });
+    }
+    all.sort(function (a, b) {
+      return a.anchorY - b.anchorY;
+    });
+    var cursor = 48;
+    for (var i = 0; i < all.length; i++) {
+      var top = Math.max(all[i].anchorY, cursor);
+      all[i].node.style.top = top + "px";
+      cursor = top + all[i].node.offsetHeight + 8;
+    }
+  }
+
+  function createBubbleShell() {
+    var node = document.createElement("div");
+    node.className = "bubble";
+    node.style.position = "fixed";
+    node.style.right = "12px";
+    node.style.width = "250px";
+    node.style.background = "#fff";
+    node.style.border = "1px solid #e3e5e9";
+    node.style.borderRadius = "8px";
+    node.style.padding = "10px 12px";
+    node.style.boxShadow = "0 1px 4px rgba(20,24,33,.08)";
+    node.style.pointerEvents = "auto";
+    node.style.fontSize = "13px";
+    node.style.boxSizing = "border-box";
+    node.style.zIndex = "900";
+    document.body.appendChild(node);
+    return node;
+  }
+
+  function closeDraftBubble() {
+    if (!draftBubble) return;
+    draftBubble.node.remove();
+    draftBubble = null;
+    layoutBubbles();
+  }
+
+  function addDraftToQueue() {
+    if (!draftBubble) return;
+    var comment = draftBubble.textarea.value;
+    var node = draftBubble.node;
+    node.textContent = "";
+    node.className = "bubble";
+    var text = document.createElement("div");
+    text.className = "bubble-comment";
+    text.textContent = comment;
+    var deleteBtn = document.createElement("button");
+    deleteBtn.className = "bubble-delete";
+    deleteBtn.textContent = "Delete";
+    node.appendChild(text);
+    node.appendChild(deleteBtn);
+
+    var id = "a-" + nextQueueId++;
+    var item = {
+      id: id,
+      node: node,
+      anchorY: draftBubble.anchorY,
+      selector: draftBubble.selResult.selector,
+      shadowHost: draftBubble.selResult.shadowHost,
+      comment: comment,
+      target: draftBubble.target,
+    };
+    queue.push(item);
+    node.setAttribute("data-annotation-id", id);
+
+    deleteBtn.addEventListener("click", function () {
+      removeFromQueue(id);
+    });
+
+    draftBubble = null;
+    updateSendAllLabel();
+    layoutBubbles();
+  }
+
+  function removeFromQueue(id) {
+    var idx = -1;
+    for (var i = 0; i < queue.length; i++) {
+      if (queue[i].id === id) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx === -1) return;
+    queue[idx].node.remove();
+    queue.splice(idx, 1);
+    updateSendAllLabel();
+    layoutBubbles();
+  }
+
+  function openDraftBubble(target) {
+    if (draftBubble) closeDraftBubble();
+
+    var selResult = generateSelector(target);
+    var node = createBubbleShell();
+    node.className = "bubble bubble-draft";
+
+    var textarea = document.createElement("textarea");
+    textarea.style.width = "100%";
+    textarea.style.boxSizing = "border-box";
+    textarea.rows = 3;
+
+    var addBtn = document.createElement("button");
+    addBtn.className = "bubble-add";
+    addBtn.textContent = "Add to queue";
+    var cancelBtn = document.createElement("button");
+    cancelBtn.className = "bubble-cancel";
+    cancelBtn.textContent = "Cancel";
+
+    node.appendChild(textarea);
+    node.appendChild(addBtn);
+    node.appendChild(cancelBtn);
+
+    draftBubble = {
+      node: node,
+      anchorY: targetAnchorY(target),
+      target: target,
+      selResult: selResult,
+      textarea: textarea,
+    };
+
+    addBtn.addEventListener("click", addDraftToQueue);
+    cancelBtn.addEventListener("click", closeDraftBubble);
+
+    layoutBubbles();
+  }
+
+  sendAllButton.addEventListener("click", function () {
+    // Placeholder for this phase: no network request, no state change.
+    // Real submission wiring lands in Phase 5.
+  });
+
   function onIframeClick(e) {
     if (!reviewOn) return;
     var doc = getIframeDoc();
@@ -186,6 +341,7 @@ export function renderClientScript(): string {
     }
     e.preventDefault();
     e.stopPropagation();
+    openDraftBubble(e.target);
   }
 
   function attachOverlayListeners() {
