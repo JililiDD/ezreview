@@ -11,11 +11,11 @@ describe("idle auto-exit end-to-end", () => {
     const artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
 
-    const handle = await startReviewServer({ artifactPath, basePort: 5100, idleTimeoutMs: 100 });
+    const handle = await startReviewServer({ artifactPath, basePort: 5100, idleTimeoutMs: 300 });
 
     try {
       assert.equal(handle.server.listening, true);
-      await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 800));
       assert.equal(handle.server.listening, false);
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -27,7 +27,12 @@ describe("idle auto-exit end-to-end", () => {
     const artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
 
-    const handle = await startReviewServer({ artifactPath, basePort: 5110, idleTimeoutMs: 100 });
+    // idleTimeoutMs is deliberately generous relative to real connection-establishment
+    // latency: the idle timer arms the instant the server starts (before this test's
+    // own fetch has a chance to connect), so a too-tight window here can race the
+    // idle-exit against the client's own connection setup and produce a spurious
+    // ECONNRESET instead of testing the intended "stays up while connected" behavior.
+    const handle = await startReviewServer({ artifactPath, basePort: 5110, idleTimeoutMs: 500 });
     const controller = new AbortController();
 
     try {
@@ -37,7 +42,7 @@ describe("idle auto-exit end-to-end", () => {
       });
       await res.body!.getReader().read(); // consume ":ok"
 
-      await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 800));
       assert.equal(handle.server.listening, true, "should not idle-exit while a client is connected");
     } finally {
       controller.abort();
