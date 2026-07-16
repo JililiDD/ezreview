@@ -399,8 +399,9 @@ export function renderClientScript(): string {
     // on an already-attached node reorders it. Horizontal placement and
     // spacing are pure CSS (.bubble's left/right/margin-bottom); the
     // rail's own overflow-y: auto handles anything that doesn't fit.
+    // draftBubble is deliberately excluded — it floats over the content
+    // near where it was opened until addDraftToQueue moves it in.
     var all = queue.concat(sentItems);
-    if (draftBubble) all.push(draftBubble);
     all.sort(function (a, b) {
       return a.anchorY - b.anchorY;
     });
@@ -491,6 +492,12 @@ export function renderClientScript(): string {
     }
   }
 
+  // Drafts float over the content near where the user just clicked/selected
+  // (position: fixed, appended to document.body) rather than appearing in
+  // the rail right away — only once "Add to queue" commits it does the same
+  // node move into #rail-scroll (see addDraftToQueue). createBubbleShell is
+  // only ever called to start a fresh draft, never reused for an
+  // already-queued bubble, so it's safe to always build the floating form.
   function createBubbleShell() {
     var node = document.createElement("div");
     node.className = "bubble";
@@ -502,8 +509,24 @@ export function renderClientScript(): string {
     node.style.fontSize = "13px";
     node.style.boxSizing = "border-box";
     node.style.marginBottom = "8px";
-    railScroll.appendChild(node);
+    node.style.position = "fixed";
+    node.style.width = "260px";
+    node.style.zIndex = "900";
+    document.body.appendChild(node);
     return node;
+  }
+
+  function positionFloatingBubble(node, pageX, pageY) {
+    var width = 260;
+    // Estimated height (textarea + Add/Cancel buttons) — the real height
+    // isn't known until the browser lays it out, but clamping needs a
+    // number now so the bubble's *bottom* stays on-screen too, not just
+    // its top-left corner.
+    var estimatedHeight = 160;
+    var maxLeft = Math.max(12, window.innerWidth - width - 12);
+    node.style.left = Math.min(Math.max(pageX, 12), maxLeft) + "px";
+    var maxTop = Math.max(48, window.innerHeight - estimatedHeight - 12);
+    node.style.top = Math.min(Math.max(pageY, 48), maxTop) + "px";
   }
 
   function closeDraftBubble() {
@@ -673,6 +696,15 @@ export function renderClientScript(): string {
     var node = draftBubble.node;
     node.textContent = "";
     node.className = "bubble";
+    // Clear the floating-draft positioning — layoutBubbles() below moves
+    // this node into #rail-scroll, where it should behave like any other
+    // rail bubble (normal document flow), not still be pinned to whatever
+    // fixed viewport position it was opened at.
+    node.style.position = "";
+    node.style.left = "";
+    node.style.top = "";
+    node.style.width = "";
+    node.style.zIndex = "";
     var text = document.createElement("div");
     text.className = "bubble-comment";
     text.textContent = comment;
@@ -781,7 +813,7 @@ export function renderClientScript(): string {
     layoutBubbles();
   }
 
-  function openDraftBubble(target) {
+  function openDraftBubble(target, clickX, clickY) {
     if (draftBubble) closeDraftBubble();
 
     var selResult = generateSelector(target);
@@ -804,6 +836,10 @@ export function renderClientScript(): string {
     node.appendChild(addBtn);
     node.appendChild(cancelBtn);
 
+    var frameRect = frame.getBoundingClientRect();
+    positionFloatingBubble(node, frameRect.left + clickX, frameRect.top + clickY);
+    textarea.focus();
+
     draftBubble = {
       node: node,
       anchorY: targetAnchorY(target),
@@ -815,8 +851,6 @@ export function renderClientScript(): string {
 
     addBtn.addEventListener("click", addDraftToQueue);
     cancelBtn.addEventListener("click", closeDraftBubble);
-
-    layoutBubbles();
   }
 
   function nearestElementAncestor(node) {
@@ -890,6 +924,9 @@ export function renderClientScript(): string {
     var rect = range.getBoundingClientRect();
     var frameRect = frame.getBoundingClientRect();
 
+    positionFloatingBubble(node, frameRect.left + rect.left, frameRect.top + rect.bottom + 6);
+    textarea.focus();
+
     draftBubble = {
       node: node,
       anchorY: frameRect.top + rect.top,
@@ -903,8 +940,6 @@ export function renderClientScript(): string {
 
     addBtn.addEventListener("click", addDraftToQueue);
     cancelBtn.addEventListener("click", closeDraftBubble);
-
-    layoutBubbles();
   }
 
   function truncateText(text, max) {
@@ -994,7 +1029,7 @@ export function renderClientScript(): string {
     }
     e.preventDefault();
     e.stopPropagation();
-    openDraftBubble(e.target);
+    openDraftBubble(e.target, e.clientX, e.clientY);
   }
 
   function attachOverlayListeners() {

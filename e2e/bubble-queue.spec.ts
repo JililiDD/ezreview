@@ -32,6 +32,45 @@ test("clicking an element opens a draft bubble with Add to queue / Cancel", asyn
   await expect(draft.locator(".bubble-cancel")).toBeVisible();
 });
 
+test("the draft bubble opens floating near the clicked element, not already inside the comment rail", async ({ page }) => {
+  await page.goto(handle.url);
+  const frame = page.frameLocator("#artifact-frame");
+  await frame.locator("#near-top").click();
+
+  const draftBox = await page.locator(".bubble-draft").boundingBox();
+  const targetBox = await frame.locator("#near-top").boundingBox();
+  const railBox = await page.locator("#comment-rail").boundingBox();
+  expect(draftBox).not.toBeNull();
+  expect(targetBox).not.toBeNull();
+  expect(railBox).not.toBeNull();
+
+  // Near the click, not off in the rail on the other side of the page.
+  expect(Math.abs(draftBox!.y - targetBox!.y)).toBeLessThan(150);
+  expect(draftBox!.x).toBeLessThan(railBox!.x);
+
+  const isInRail = await page.locator("#comment-rail .bubble-draft").count();
+  expect(isInRail).toBe(0);
+});
+
+test("the draft bubble's textarea is auto-focused, ready to type without an extra click", async ({ page }) => {
+  await page.goto(handle.url);
+  const frame = page.frameLocator("#artifact-frame");
+  await frame.locator("#near-top").click();
+
+  await expect(page.locator(".bubble-draft textarea")).toBeFocused();
+});
+
+test("committing the draft (Add to queue) moves the bubble into the comment rail", async ({ page }) => {
+  await page.goto(handle.url);
+  const frame = page.frameLocator("#artifact-frame");
+  await frame.locator("#near-top").click();
+  await page.locator(".bubble-draft textarea").fill("move me into the rail");
+  await page.locator(".bubble-draft .bubble-add").click();
+
+  await expect(page.locator("#comment-rail .bubble")).toHaveCount(1);
+  await expect(page.locator("body > .bubble")).toHaveCount(0);
+});
+
 test("Cancel discards the draft without touching the queue", async ({ page }) => {
   await page.goto(handle.url);
   const frame = page.frameLocator("#artifact-frame");
