@@ -516,6 +516,69 @@ export function renderClientScript(): string {
     return node;
   }
 
+  // Shared by openDraftBubble/openTextDraftBubble — draft controls (textarea
+  // + Add + a close "x") look the same regardless of which kind of
+  // annotation is being drafted.
+  function buildDraftControls(node) {
+    var closeBtn = document.createElement("button");
+    closeBtn.className = "bubble-cancel";
+    closeBtn.textContent = "×";
+    closeBtn.title = "Cancel";
+    closeBtn.style.position = "absolute";
+    closeBtn.style.top = "6px";
+    closeBtn.style.right = "6px";
+    closeBtn.style.width = "20px";
+    closeBtn.style.height = "20px";
+    closeBtn.style.lineHeight = "18px";
+    closeBtn.style.border = "none";
+    closeBtn.style.background = "transparent";
+    closeBtn.style.color = "var(--chrome-dim)";
+    closeBtn.style.fontSize = "16px";
+    closeBtn.style.cursor = "pointer";
+    closeBtn.style.borderRadius = "4px";
+    closeBtn.style.padding = "0";
+
+    var textarea = document.createElement("textarea");
+    textarea.style.display = "block";
+    textarea.style.width = "100%";
+    textarea.style.boxSizing = "border-box";
+    textarea.style.marginTop = "16px";
+    textarea.style.border = "1px solid #e3e5e9";
+    textarea.style.borderRadius = "6px";
+    textarea.style.padding = "6px 8px";
+    textarea.style.fontSize = "13px";
+    textarea.style.fontFamily = "inherit";
+    textarea.style.resize = "vertical";
+    textarea.rows = 3;
+
+    var footer = document.createElement("div");
+    footer.style.display = "flex";
+    footer.style.justifyContent = "flex-end";
+    footer.style.marginTop = "8px";
+
+    var addBtn = document.createElement("button");
+    addBtn.className = "bubble-add";
+    addBtn.textContent = "Add";
+    // Same look as the toolbar's Send all button (var(--accent) fill).
+    addBtn.style.background = "var(--accent)";
+    addBtn.style.color = "#fff";
+    addBtn.style.border = "none";
+    addBtn.style.borderRadius = "6px";
+    addBtn.style.padding = "6px 14px";
+    addBtn.style.fontSize = "12.5px";
+    addBtn.style.cursor = "pointer";
+    footer.appendChild(addBtn);
+
+    node.appendChild(closeBtn);
+    node.appendChild(textarea);
+    node.appendChild(footer);
+
+    closeBtn.addEventListener("click", closeDraftBubble);
+    addBtn.addEventListener("click", addDraftToQueue);
+
+    return { textarea: textarea };
+  }
+
   function positionFloatingBubble(node, pageX, pageY) {
     var width = 260;
     // Estimated height (textarea + Add/Cancel buttons) — the real height
@@ -820,25 +883,11 @@ export function renderClientScript(): string {
     var node = createBubbleShell();
     node.className = "bubble bubble-draft";
 
-    var textarea = document.createElement("textarea");
-    textarea.style.width = "100%";
-    textarea.style.boxSizing = "border-box";
-    textarea.rows = 3;
-
-    var addBtn = document.createElement("button");
-    addBtn.className = "bubble-add";
-    addBtn.textContent = "Add to queue";
-    var cancelBtn = document.createElement("button");
-    cancelBtn.className = "bubble-cancel";
-    cancelBtn.textContent = "Cancel";
-
-    node.appendChild(textarea);
-    node.appendChild(addBtn);
-    node.appendChild(cancelBtn);
+    var controls = buildDraftControls(node);
 
     var frameRect = frame.getBoundingClientRect();
     positionFloatingBubble(node, frameRect.left + clickX, frameRect.top + clickY);
-    textarea.focus();
+    controls.textarea.focus();
 
     draftBubble = {
       node: node,
@@ -846,11 +895,8 @@ export function renderClientScript(): string {
       type: "element-annotation",
       target: target,
       selResult: selResult,
-      textarea: textarea,
+      textarea: controls.textarea,
     };
-
-    addBtn.addEventListener("click", addDraftToQueue);
-    cancelBtn.addEventListener("click", closeDraftBubble);
   }
 
   function nearestElementAncestor(node) {
@@ -905,27 +951,13 @@ export function renderClientScript(): string {
     var node = createBubbleShell();
     node.className = "bubble bubble-draft";
 
-    var textarea = document.createElement("textarea");
-    textarea.style.width = "100%";
-    textarea.style.boxSizing = "border-box";
-    textarea.rows = 3;
-
-    var addBtn = document.createElement("button");
-    addBtn.className = "bubble-add";
-    addBtn.textContent = "Add to queue";
-    var cancelBtn = document.createElement("button");
-    cancelBtn.className = "bubble-cancel";
-    cancelBtn.textContent = "Cancel";
-
-    node.appendChild(textarea);
-    node.appendChild(addBtn);
-    node.appendChild(cancelBtn);
+    var controls = buildDraftControls(node);
 
     var rect = range.getBoundingClientRect();
     var frameRect = frame.getBoundingClientRect();
 
     positionFloatingBubble(node, frameRect.left + rect.left, frameRect.top + rect.bottom + 6);
-    textarea.focus();
+    controls.textarea.focus();
 
     draftBubble = {
       node: node,
@@ -935,11 +967,8 @@ export function renderClientScript(): string {
       selectedText: selectedText,
       context: context,
       nearestSelectorResult: nearestSelectorResult,
-      textarea: textarea,
+      textarea: controls.textarea,
     };
-
-    addBtn.addEventListener("click", addDraftToQueue);
-    cancelBtn.addEventListener("click", closeDraftBubble);
   }
 
   function truncateText(text, max) {
