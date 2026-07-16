@@ -5,6 +5,7 @@ export function renderClientScript(): string {
   var statusText = document.getElementById("status-text");
   var frame = document.getElementById("artifact-frame");
   var reviewSwitch = document.getElementById("review-switch");
+  var scrollHint = document.getElementById("scroll-hint");
   var commentRail = document.getElementById("comment-rail");
   var railScroll = document.getElementById("rail-scroll");
   var railGrip = document.getElementById("rail-grip");
@@ -116,6 +117,29 @@ export function renderClientScript(): string {
 
   var reviewOn = reviewSwitch.getAttribute("data-on") === "true";
   var currentHoverTarget = null;
+  // "Select a wider element" while hovering: scroll wheel walks up the
+  // ancestor chain from whatever's directly under the cursor. Free for
+  // table cells specifically (td -> tr -> table are already ancestors — no
+  // table-specific code needed), and generalizes to any nested markup.
+  var hoverBaseTarget = null;
+  var hoverLevel = 0;
+  var HOVER_LEVEL_MAX = 6;
+
+  function climbAncestors(el, n) {
+    var node = el;
+    for (var i = 0; i < n; i++) {
+      var parent = node.parentElement;
+      // Stop before escaping to <body>/<html> — annotating the whole page
+      // body is never a meaningful target. Also naturally stops at a shadow
+      // root's own boundary: a direct child of a ShadowRoot has
+      // parentElement === null (ShadowRoot isn't an Element), so climbing
+      // can't escape a shadow tree this way either.
+      if (!parent || parent.tagName === "BODY" || parent.tagName === "HTML") break;
+      node = parent;
+    }
+    return node;
+  }
+
   var highlightBox = document.createElement("div");
   highlightBox.id = "element-highlight";
   highlightBox.style.position = "fixed";
@@ -165,7 +189,13 @@ export function renderClientScript(): string {
 
   function onIframeMouseMove(e) {
     if (!reviewOn) return;
-    currentHoverTarget = e.target;
+    if (e.target !== hoverBaseTarget) {
+      // A genuinely different hover start — reset the climb level, so it
+      // doesn't carry over confusingly from whatever was hovered before.
+      hoverBaseTarget = e.target;
+      hoverLevel = 0;
+    }
+    currentHoverTarget = climbAncestors(hoverBaseTarget, hoverLevel);
     if (mouseMoveFramePending) return;
     mouseMoveFramePending = true;
     window.requestAnimationFrame(function () {
@@ -176,7 +206,17 @@ export function renderClientScript(): string {
 
   function onIframeMouseLeave() {
     currentHoverTarget = null;
+    hoverBaseTarget = null;
+    hoverLevel = 0;
     hideHighlight();
+  }
+
+  function onIframeWheel(e) {
+    if (!reviewOn || !hoverBaseTarget) return;
+    e.preventDefault();
+    hoverLevel = Math.max(0, Math.min(HOVER_LEVEL_MAX, hoverLevel + (e.deltaY > 0 ? 1 : -1)));
+    currentHoverTarget = climbAncestors(hoverBaseTarget, hoverLevel);
+    positionHighlight(currentHoverTarget);
   }
 
   // ---- Text-selection annotation (always active, independent of Review toggle) ----
@@ -1075,7 +1115,10 @@ export function renderClientScript(): string {
     }
     e.preventDefault();
     e.stopPropagation();
-    openDraftBubble(e.target, e.clientX, e.clientY);
+    // currentHoverTarget reflects any wheel-escalated level, not just the
+    // raw click target — a real mousemove always precedes a click, but fall
+    // back to e.target defensively in case it somehow doesn't.
+    openDraftBubble(currentHoverTarget || e.target, e.clientX, e.clientY);
   }
 
   function attachOverlayListeners() {
@@ -1085,6 +1128,8 @@ export function renderClientScript(): string {
     doc.addEventListener("mouseleave", onIframeMouseLeave);
     doc.addEventListener("click", onIframeClick, true);
     doc.addEventListener("scroll", refreshHighlightPosition, true);
+    doc.addEventListener("wheel", onIframeWheel, { passive: false });
+    scrollHint.classList.add("visible");
   }
 
   function detachOverlayListeners() {
@@ -1094,9 +1139,13 @@ export function renderClientScript(): string {
       doc.removeEventListener("mouseleave", onIframeMouseLeave);
       doc.removeEventListener("click", onIframeClick, true);
       doc.removeEventListener("scroll", refreshHighlightPosition, true);
+      doc.removeEventListener("wheel", onIframeWheel);
     }
     currentHoverTarget = null;
+    hoverBaseTarget = null;
+    hoverLevel = 0;
     hideHighlight();
+    scrollHint.classList.remove("visible");
   }
 
   frame.addEventListener("load", function () {

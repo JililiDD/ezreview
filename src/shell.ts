@@ -99,6 +99,14 @@ export function renderShellPage(): string {
   .switch[data-on="false"] .switch-knob {
     left: 2px;
   }
+  #scroll-hint {
+    color: var(--chrome-dim);
+    font-size: 11.5px;
+    display: none;
+  }
+  #scroll-hint.visible {
+    display: inline;
+  }
   #send-all {
     background: var(--accent);
     color: #fff;
@@ -179,6 +187,7 @@ export function renderShellPage(): string {
       <span>Review</span>
       <span class="switch" id="review-switch" data-on="true"><span class="switch-knob"></span></span>
     </div>
+    <span id="scroll-hint">Scroll while hovering to widen the selection</span>
     <button id="send-all">Send all (0)</button>
   </div>
   <div id="stage">
