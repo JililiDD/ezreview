@@ -123,19 +123,6 @@ export function renderClientScript(): string {
   highlightBox.style.boxSizing = "border-box";
   document.body.appendChild(highlightBox);
 
-  var selectorLabel = document.createElement("div");
-  selectorLabel.id = "selector-label";
-  selectorLabel.style.position = "fixed";
-  selectorLabel.style.background = "var(--chrome-bg)";
-  selectorLabel.style.color = "var(--chrome-fg)";
-  selectorLabel.style.font = "11px ui-monospace, Consolas, monospace";
-  selectorLabel.style.padding = "2px 6px";
-  selectorLabel.style.borderRadius = "4px";
-  selectorLabel.style.pointerEvents = "none";
-  selectorLabel.style.zIndex = "1001";
-  selectorLabel.style.display = "none";
-  document.body.appendChild(selectorLabel);
-
   function getIframeDoc() {
     try {
       return frame.contentDocument;
@@ -158,19 +145,10 @@ export function renderClientScript(): string {
     highlightBox.style.width = rect.width + "px";
     highlightBox.style.height = rect.height + "px";
     highlightBox.style.display = "block";
-
-    var result = generateSelector(target);
-    selectorLabel.textContent = result.shadowHost
-      ? result.shadowHost + " ⇒ " + result.selector
-      : result.selector;
-    selectorLabel.style.left = left + "px";
-    selectorLabel.style.top = Math.max(0, top - 20) + "px";
-    selectorLabel.style.display = "block";
   }
 
   function hideHighlight() {
     highlightBox.style.display = "none";
-    selectorLabel.style.display = "none";
   }
 
   function refreshHighlightPosition() {
