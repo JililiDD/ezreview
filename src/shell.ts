@@ -110,6 +110,12 @@ export function renderShellPage(): string {
   }
   #stage {
     flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+  #artifact-pane {
+    flex: 1;
+    min-width: 0;
     background: var(--stage-bg);
     position: relative;
   }
@@ -118,6 +124,38 @@ export function renderShellPage(): string {
     height: 100%;
     border: none;
     display: block;
+  }
+  #rail-grip {
+    width: 6px;
+    flex: 0 0 6px;
+    cursor: col-resize;
+    background: var(--chrome-border);
+  }
+  #comment-rail {
+    flex: 0 0 auto;
+    width: 280px;
+    background: #fff;
+    border-left: 1px solid var(--chrome-border);
+    position: relative;
+    overflow: hidden;
+  }
+  #comment-rail.collapsed {
+    border-left-color: transparent;
+  }
+  #rail-collapse {
+    position: absolute;
+    top: 8px;
+    left: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--chrome-bg);
+    color: #fff;
+    border: 1px solid var(--chrome-border);
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 950;
   }
 </style>
 </head>
@@ -136,7 +174,13 @@ export function renderShellPage(): string {
     <button id="send-all">Send all (0)</button>
   </div>
   <div id="stage">
-    <iframe id="artifact-frame" src="/artifact"></iframe>
+    <div id="artifact-pane">
+      <iframe id="artifact-frame" src="/artifact"></iframe>
+    </div>
+    <div id="rail-grip"></div>
+    <div id="comment-rail">
+      <button id="rail-collapse" title="Collapse comments">‹</button>
+    </div>
   </div>
   <script>${renderClientScript()}</script>
 </body>

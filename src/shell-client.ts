@@ -5,6 +5,9 @@ export function renderClientScript(): string {
   var statusText = document.getElementById("status-text");
   var frame = document.getElementById("artifact-frame");
   var reviewSwitch = document.getElementById("review-switch");
+  var commentRail = document.getElementById("comment-rail");
+  var railGrip = document.getElementById("rail-grip");
+  var railCollapseBtn = document.getElementById("rail-collapse");
 
   function setConnected() {
     dot.classList.remove("disconnected");
@@ -260,6 +263,72 @@ export function renderClientScript(): string {
     setupTextHighlightRegistry();
   }
 
+  // ---- Comment rail: resize + collapse ----
+  // Bubbles stay position: fixed (as before the rail existed) rather than
+  // becoming DOM children of #comment-rail — #comment-rail is just the
+  // visual background column that reserves layout space so the iframe pane
+  // shrinks to make room. Bubble horizontal placement (left/width) is
+  // derived from the rail's live boundingClientRect on every layoutBubbles()
+  // call, so it tracks resize/collapse without a separate sync path.
+
+  var RAIL_MIN_WIDTH = 180;
+  var RAIL_MAX_WIDTH = 480;
+  var RAIL_COLLAPSED_WIDTH = 28;
+  var railWidth = 280;
+  var railCollapsed = false;
+
+  function allBubbleNodes() {
+    var nodes = queue.concat(sentItems).concat(historyItems).map(function (q) {
+      return q.node;
+    });
+    if (draftBubble) nodes.push(draftBubble.node);
+    return nodes;
+  }
+
+  function applyRailWidth() {
+    commentRail.style.width = (railCollapsed ? RAIL_COLLAPSED_WIDTH : railWidth) + "px";
+    commentRail.classList.toggle("collapsed", railCollapsed);
+    railCollapseBtn.textContent = railCollapsed ? "›" : "‹";
+    var nodes = allBubbleNodes();
+    for (var i = 0; i < nodes.length; i++) {
+      nodes[i].style.display = railCollapsed ? "none" : "";
+    }
+    renderHistoryGroup();
+    layoutBubbles();
+  }
+
+  railCollapseBtn.addEventListener("click", function () {
+    railCollapsed = !railCollapsed;
+    applyRailWidth();
+  });
+
+  var railResizing = false;
+
+  // Pointer capture (not a plain document mousemove listener) — dragging the
+  // grip toward the iframe pane moves the real cursor over the iframe's own
+  // document, which dispatches its own events and never bubbles them to the
+  // shell page's top-level document. setPointerCapture routes every
+  // subsequent pointer event to the grip itself regardless of what's
+  // visually underneath, so the drag keeps working across that boundary.
+  railGrip.addEventListener("pointerdown", function (e) {
+    if (railCollapsed) return;
+    railResizing = true;
+    railGrip.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  railGrip.addEventListener("pointermove", function (e) {
+    if (!railResizing) return;
+    var newWidth = window.innerWidth - e.clientX;
+    railWidth = Math.max(RAIL_MIN_WIDTH, Math.min(RAIL_MAX_WIDTH, newWidth));
+    applyRailWidth();
+  });
+  railGrip.addEventListener("pointerup", function (e) {
+    railResizing = false;
+    railGrip.releasePointerCapture(e.pointerId);
+  });
+
+  window.addEventListener("resize", layoutBubbles);
+
   // ---- Bubble queue (draft -> queue -> delete; Send all is a placeholder) ----
 
   var sendAllButton = document.getElementById("send-all");
@@ -276,8 +345,6 @@ export function renderClientScript(): string {
   historyContainer.id = "history-group";
   historyContainer.style.position = "fixed";
   historyContainer.style.top = "48px";
-  historyContainer.style.right = "12px";
-  historyContainer.style.width = "250px";
   historyContainer.style.display = "none";
   historyContainer.style.zIndex = "890";
   document.body.appendChild(historyContainer);
@@ -300,7 +367,7 @@ export function renderClientScript(): string {
 
   function renderHistoryGroup() {
     historyHeader.textContent = "Processed (" + historyItems.length + ")";
-    historyContainer.style.display = historyItems.length > 0 ? "block" : "none";
+    historyContainer.style.display = !railCollapsed && historyItems.length > 0 ? "block" : "none";
     historyList.style.display = historyExpanded ? "block" : "none";
   }
 
@@ -315,7 +382,7 @@ export function renderClientScript(): string {
       var item = sentItems[i];
       item.node.style.position = "static";
       item.node.style.top = "auto";
-      item.node.style.right = "auto";
+      item.node.style.left = "auto";
       item.node.style.width = "auto";
       item.node.style.marginBottom = "8px";
       historyList.appendChild(item.node);
@@ -337,6 +404,17 @@ export function renderClientScript(): string {
   }
 
   function layoutBubbles() {
+    // Horizontal placement is derived from the rail's live boundingClientRect
+    // on every call (not cached at creation time) so it stays correct across
+    // resize/collapse without a separate sync path — layoutBubbles() already
+    // runs after every mutation that could need repositioning.
+    var railRect = commentRail.getBoundingClientRect();
+    var bubbleLeft = railRect.left + 12;
+    var bubbleWidth = Math.max(0, railRect.width - 24);
+
+    historyContainer.style.left = bubbleLeft + "px";
+    historyContainer.style.width = bubbleWidth + "px";
+
     // sentItems participate too (same fixed-position stacking as queue) —
     // only historyItems are excluded, since those already moved into the
     // separate, non-fixed history container on the last reload.
@@ -352,6 +430,8 @@ export function renderClientScript(): string {
     var historyHeight = historyItems.length > 0 ? historyContainer.offsetHeight + 8 : 0;
     var cursor = 48 + historyHeight;
     for (var i = 0; i < all.length; i++) {
+      all[i].node.style.left = bubbleLeft + "px";
+      all[i].node.style.width = bubbleWidth + "px";
       var top = Math.max(all[i].anchorY, cursor);
       all[i].node.style.top = top + "px";
       cursor = top + all[i].node.offsetHeight + 8;
@@ -444,8 +524,7 @@ export function renderClientScript(): string {
     var node = document.createElement("div");
     node.className = "bubble";
     node.style.position = "fixed";
-    node.style.right = "12px";
-    node.style.width = "250px";
+    // left/width set by layoutBubbles(), called right after this returns.
     node.style.background = "#fff";
     node.style.border = "1px solid #e3e5e9";
     node.style.borderRadius = "8px";
