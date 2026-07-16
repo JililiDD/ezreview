@@ -511,6 +511,137 @@ export function renderClientScript(): string {
     }
   }
 
+  // ---- Text annotation re-anchoring after a reload ----
+  //
+  // A lost text annotation's original selectedText may simply have moved
+  // (an unrelated edit shifted it) or may have been replaced outright by
+  // the very edit the annotation asked for — in the latter case the
+  // annotation should stay lost, since the text it was about is gone.
+  // Both cases are told apart by anchoring on context.before/context.after
+  // alone (never on the old selectedText): if the same landmarks on both
+  // sides of the original selection can be found again, uniquely, with a
+  // plausibly small gap between them, whatever now sits in that gap — same
+  // text or edited text — is treated as this annotation's current location.
+
+  var REANCHOR_MAX_GAP = 500;
+
+  function buildTextIndex(root) {
+    var doc = root.ownerDocument;
+    var walker = doc.createTreeWalker(root, 4, null); // 4 = NodeFilter.SHOW_TEXT
+    var nodes = [];
+    var text = "";
+    var node;
+    while ((node = walker.nextNode())) {
+      var start = text.length;
+      text += node.nodeValue;
+      nodes.push({ node: node, start: start, end: text.length });
+    }
+    return { text: text, nodes: nodes };
+  }
+
+  function pointAtOffset(index, offset) {
+    for (var i = 0; i < index.nodes.length; i++) {
+      var n = index.nodes[i];
+      if (offset >= n.start && offset <= n.end) {
+        return { node: n.node, offset: offset - n.start };
+      }
+    }
+    return null;
+  }
+
+  // -1 for "not found" AND for "found more than once" — an ambiguous
+  // landmark is as unusable as a missing one; the caller can't tell them
+  // apart and shouldn't try to.
+  function findUniqueOccurrence(haystack, needle) {
+    var first = haystack.indexOf(needle);
+    if (first === -1) return -1;
+    if (haystack.indexOf(needle, first + 1) !== -1) return -1;
+    return first;
+  }
+
+  function resolveTextAnnotationScope(item) {
+    // Deliberately NOT item.nearestSelector: getTextContext climbs ancestors
+    // independently (until it finds ~200 chars of surrounding text, capped
+    // at <html>) to build context.before/after, so the captured context can
+    // reach well outside nearestSelector's element for a short paragraph.
+    // The search scope has to match that same real ceiling — the shadow
+    // root boundary for shadow content (climbing can't escape it either,
+    // since a shadow root has no parentElement), <html> otherwise.
+    var doc = getIframeDoc();
+    if (!doc) return null;
+    if (item.shadowHost) {
+      try {
+        var host = doc.querySelector(item.shadowHost);
+        if (host && host.shadowRoot) return host.shadowRoot;
+      } catch (e) {
+        // fall through to the top-level document
+      }
+    }
+    return doc.documentElement || doc.body;
+  }
+
+  function tryReanchorTextAnnotation(item) {
+    var scopeRoot = resolveTextAnnotationScope(item);
+    if (!scopeRoot) return null;
+    var index = buildTextIndex(scopeRoot);
+    var text = index.text;
+    var before = (item.context && item.context.before) || "";
+    var after = (item.context && item.context.after) || "";
+
+    var beforeEnd;
+    if (before === "") {
+      beforeEnd = 0;
+    } else {
+      var beforeStart = findUniqueOccurrence(text, before);
+      if (beforeStart === -1) return null;
+      beforeEnd = beforeStart + before.length;
+    }
+
+    var afterStart;
+    if (after === "") {
+      afterStart = text.length;
+    } else {
+      afterStart = findUniqueOccurrence(text, after);
+      if (afterStart === -1) return null;
+    }
+
+    if (afterStart < beforeEnd || afterStart - beforeEnd > REANCHOR_MAX_GAP) return null;
+
+    var startPoint = pointAtOffset(index, beforeEnd);
+    var endPoint = pointAtOffset(index, afterStart);
+    if (!startPoint || !endPoint) return null;
+
+    var range = scopeRoot.ownerDocument.createRange();
+    try {
+      range.setStart(startPoint.node, startPoint.offset);
+      range.setEnd(endPoint.node, endPoint.offset);
+    } catch (e) {
+      return null;
+    }
+    return range;
+  }
+
+  function reanchorLostTextAnnotations() {
+    // historyItems included here (unlike markTextAnnotationsLost above):
+    // by the time this runs — after the new document has finished loading —
+    // this reload's moveSentItemsIntoHistory call has already moved items
+    // that were in sentItems a moment ago into historyItems.
+    var lists = [queue, sentItems, historyItems];
+    for (var l = 0; l < lists.length; l++) {
+      for (var i = 0; i < lists[l].length; i++) {
+        var item = lists[l][i];
+        if (item.type !== "text-annotation" || !item.lost) continue;
+        var newRange = tryReanchorTextAnnotation(item);
+        if (newRange) {
+          item.range = newRange;
+          item.lost = false;
+          setAnchorLost(item.node, false);
+          if (textHighlightSet) textHighlightSet.add(newRange);
+        }
+      }
+    }
+  }
+
   function addDraftToQueue() {
     if (!draftBubble) return;
     var comment = draftBubble.textarea.value;
@@ -865,6 +996,7 @@ export function renderClientScript(): string {
   frame.addEventListener("load", function () {
     if (reviewOn) attachOverlayListeners();
     attachSelectionListeners();
+    reanchorLostTextAnnotations();
   });
   if (reviewOn) attachOverlayListeners();
   attachSelectionListeners();

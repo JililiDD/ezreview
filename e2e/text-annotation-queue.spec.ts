@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startReviewServer } from "../src/server.ts";
@@ -217,6 +217,102 @@ test("a text annotation that was already Sent before a reload is also marked los
     // The reload also moves the now-Sent bubble into the collapsed
     // "Processed" history group — expand it before hovering.
     await page.locator("#history-header").click();
+
+    const bubble = page.locator(".bubble");
+    await bubble.hover();
+    await expect(bubble.locator(".anchor-lost-badge")).toBeVisible();
+  } finally {
+    await localHandle.close();
+    rmSync(localDir, { recursive: true, force: true });
+  }
+});
+
+test("a text annotation survives a reload that only edited an unrelated part of the page", async ({ page }) => {
+  const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-text-reanchor-unrelated-e2e-"));
+  const localArtifact = join(localDir, "demo.html");
+  copyFileSync(join(import.meta.dirname, "fixtures", "text-selection.html"), localArtifact);
+  const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5530 });
+
+  try {
+    await page.goto(localHandle.url);
+    await selectSubstring(page, "#para", "testing text selection");
+    await queueCurrentSelection(page, "x");
+
+    // Targeted replace (like a real Edit call) — only the unrelated
+    // #mid-span text changes; everything else, including surrounding
+    // whitespace, stays byte-for-byte identical so context.before/after
+    // still match verbatim.
+    const original = readFileSync(localArtifact, "utf-8");
+    writeFileSync(localArtifact, original.replace("middle selectable span", "a completely rewritten middle span"));
+    await page.waitForTimeout(1200);
+
+    const bubble = page.locator(".bubble");
+    await bubble.hover();
+    await expect(bubble.locator(".anchor-lost-badge")).toHaveCount(0);
+  } finally {
+    await localHandle.close();
+    rmSync(localDir, { recursive: true, force: true });
+  }
+});
+
+test("a text annotation whose selected text was itself edited re-anchors to the replacement text", async ({ page }) => {
+  const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-text-reanchor-replaced-e2e-"));
+  const localArtifact = join(localDir, "demo.html");
+  copyFileSync(join(import.meta.dirname, "fixtures", "text-selection.html"), localArtifact);
+  const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5540 });
+
+  try {
+    await page.goto(localHandle.url);
+    await selectSubstring(page, "#para", "testing text selection");
+    await queueCurrentSelection(page, "x");
+
+    // Targeted replace of just the selected words with "CHANGED" — the
+    // surrounding context.before/after text and whitespace are untouched,
+    // matching what a real Edit call on the exact selected span would do.
+    const original = readFileSync(localArtifact, "utf-8");
+    writeFileSync(localArtifact, original.replace("testing text selection", "CHANGED"));
+    await page.waitForTimeout(1200);
+
+    const bubble = page.locator(".bubble");
+    await bubble.hover();
+    await expect(bubble.locator(".anchor-lost-badge")).toHaveCount(0);
+
+    const highlightedText = await page.evaluate(() => {
+      const item = (window as any).__annotationQueue[0];
+      return item.range.toString();
+    });
+    expect(highlightedText).toBe("CHANGED");
+  } finally {
+    await localHandle.close();
+    rmSync(localDir, { recursive: true, force: true });
+  }
+});
+
+test("a text annotation stays lost when its context landmarks are now ambiguous (found more than once)", async ({ page }) => {
+  const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-text-reanchor-ambiguous-e2e-"));
+  const localArtifact = join(localDir, "demo.html");
+  // A paragraph long enough (>200 chars) that getTextContext's ancestor
+  // climb stops at #para itself, so before/after are plain sentence text —
+  // this keeps the test independent of exactly how far the shared
+  // text-selection.html fixture's short paragraph happens to climb.
+  const longSentence =
+    "Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua before " +
+    "TARGETWORD" +
+    " after ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.";
+  writeFileSync(localArtifact, `<html><body><p id="para">${longSentence}</p></body></html>`);
+  const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5550 });
+
+  try {
+    await page.goto(localHandle.url);
+    await selectSubstring(page, "#para", "TARGETWORD");
+    await queueCurrentSelection(page, "x");
+
+    // Duplicate the whole paragraph verbatim elsewhere in the page — its
+    // before/after context now matches in two places, so the re-anchor must
+    // refuse the ambiguous match rather than guess which one is "it".
+    const original = readFileSync(localArtifact, "utf-8");
+    writeFileSync(localArtifact, original.replace("</body>", `<p>${longSentence}</p></body>`));
+    await page.waitForTimeout(1200);
 
     const bubble = page.locator(".bubble");
     await bubble.hover();
