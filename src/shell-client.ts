@@ -762,8 +762,10 @@ export function renderClientScript(): string {
     // Clear the floating-draft positioning — layoutBubbles() below moves
     // this node into #rail-scroll, where it should behave like any other
     // rail bubble (normal document flow), not still be pinned to whatever
-    // fixed viewport position it was opened at.
-    node.style.position = "";
+    // fixed viewport position it was opened at. Kept relative (not cleared
+    // to static) so the "x" delete button below still anchors to this
+    // bubble's own corner instead of escaping to a positioned ancestor.
+    node.style.position = "relative";
     node.style.left = "";
     node.style.top = "";
     node.style.width = "";
@@ -771,9 +773,24 @@ export function renderClientScript(): string {
     var text = document.createElement("div");
     text.className = "bubble-comment";
     text.textContent = comment;
+    text.style.paddingRight = "18px";
     var deleteBtn = document.createElement("button");
     deleteBtn.className = "bubble-delete";
-    deleteBtn.textContent = "Delete";
+    deleteBtn.textContent = "×";
+    deleteBtn.title = "Delete";
+    deleteBtn.style.position = "absolute";
+    deleteBtn.style.top = "6px";
+    deleteBtn.style.right = "6px";
+    deleteBtn.style.width = "20px";
+    deleteBtn.style.height = "20px";
+    deleteBtn.style.lineHeight = "18px";
+    deleteBtn.style.border = "none";
+    deleteBtn.style.background = "transparent";
+    deleteBtn.style.color = "var(--chrome-dim)";
+    deleteBtn.style.fontSize = "16px";
+    deleteBtn.style.cursor = "pointer";
+    deleteBtn.style.borderRadius = "4px";
+    deleteBtn.style.padding = "0";
     node.appendChild(text);
     node.appendChild(deleteBtn);
 
