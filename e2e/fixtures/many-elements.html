@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+<head><style>body { margin: 0; font-family: sans-serif; } li { padding: 4px; }</style></head>
+<body>
+  <ul id="list"></ul>
+  <script>
+    var list = document.getElementById("list");
+    for (var i = 0; i < 30; i++) {
+      var li = document.createElement("li");
+      li.id = "item-" + i;
+      li.textContent = "Item " + i;
+      list.appendChild(li);
+    }
+  </script>
+</body>
+</html>

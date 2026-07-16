@@ -142,6 +142,14 @@ export function renderShellPage(): string {
   #comment-rail.collapsed {
     border-left-color: transparent;
   }
+  #rail-scroll {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 40px 12px 12px;
+    box-sizing: border-box;
+  }
   #rail-collapse {
     position: absolute;
     top: 8px;
@@ -180,6 +188,7 @@ export function renderShellPage(): string {
     <div id="rail-grip"></div>
     <div id="comment-rail">
       <button id="rail-collapse" title="Collapse comments">‹</button>
+      <div id="rail-scroll"></div>
     </div>
   </div>
   <script>${renderClientScript()}</script>

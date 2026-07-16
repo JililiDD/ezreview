@@ -6,6 +6,7 @@ export function renderClientScript(): string {
   var frame = document.getElementById("artifact-frame");
   var reviewSwitch = document.getElementById("review-switch");
   var commentRail = document.getElementById("comment-rail");
+  var railScroll = document.getElementById("rail-scroll");
   var railGrip = document.getElementById("rail-grip");
   var railCollapseBtn = document.getElementById("rail-collapse");
 
@@ -264,12 +265,11 @@ export function renderClientScript(): string {
   }
 
   // ---- Comment rail: resize + collapse ----
-  // Bubbles stay position: fixed (as before the rail existed) rather than
-  // becoming DOM children of #comment-rail — #comment-rail is just the
-  // visual background column that reserves layout space so the iframe pane
-  // shrinks to make room. Bubble horizontal placement (left/width) is
-  // derived from the rail's live boundingClientRect on every layoutBubbles()
-  // call, so it tracks resize/collapse without a separate sync path.
+  // Bubbles are real DOM children of #rail-scroll in normal document flow
+  // (not position: fixed) — #rail-scroll is a plain overflow-y: auto box, so
+  // the browser's native scrollbar handles the "too many comments to fit"
+  // case for free, and horizontal placement is pure CSS (left/right on
+  // .bubble) that adapts to any rail width with zero JS involvement.
 
   var RAIL_MIN_WIDTH = 180;
   var RAIL_MAX_WIDTH = 480;
@@ -277,24 +277,12 @@ export function renderClientScript(): string {
   var railWidth = 280;
   var railCollapsed = false;
 
-  function allBubbleNodes() {
-    var nodes = queue.concat(sentItems).concat(historyItems).map(function (q) {
-      return q.node;
-    });
-    if (draftBubble) nodes.push(draftBubble.node);
-    return nodes;
-  }
-
   function applyRailWidth() {
     commentRail.style.width = (railCollapsed ? RAIL_COLLAPSED_WIDTH : railWidth) + "px";
     commentRail.classList.toggle("collapsed", railCollapsed);
     railCollapseBtn.textContent = railCollapsed ? "›" : "‹";
-    var nodes = allBubbleNodes();
-    for (var i = 0; i < nodes.length; i++) {
-      nodes[i].style.display = railCollapsed ? "none" : "";
-    }
+    railScroll.style.display = railCollapsed ? "none" : "block";
     renderHistoryGroup();
-    layoutBubbles();
   }
 
   railCollapseBtn.addEventListener("click", function () {
@@ -327,8 +315,6 @@ export function renderClientScript(): string {
     railGrip.releasePointerCapture(e.pointerId);
   });
 
-  window.addEventListener("resize", layoutBubbles);
-
   // ---- Bubble queue (draft -> queue -> delete; Send all is a placeholder) ----
 
   var sendAllButton = document.getElementById("send-all");
@@ -341,13 +327,15 @@ export function renderClientScript(): string {
   var historyItems = [];
   var historyExpanded = false;
 
+  // historyContainer is the first child ever appended to #rail-scroll, so it
+  // always renders above the queue/sent bubbles that follow it, regardless
+  // of insertion order after this point — normal document flow, no z-index
+  // or absolute-position bookkeeping needed.
   var historyContainer = document.createElement("div");
   historyContainer.id = "history-group";
-  historyContainer.style.position = "fixed";
-  historyContainer.style.top = "48px";
   historyContainer.style.display = "none";
-  historyContainer.style.zIndex = "890";
-  document.body.appendChild(historyContainer);
+  historyContainer.style.marginBottom = "8px";
+  railScroll.appendChild(historyContainer);
 
   var historyHeader = document.createElement("div");
   historyHeader.id = "history-header";
@@ -380,17 +368,12 @@ export function renderClientScript(): string {
     if (sentItems.length === 0) return;
     for (var i = 0; i < sentItems.length; i++) {
       var item = sentItems[i];
-      item.node.style.position = "static";
-      item.node.style.top = "auto";
-      item.node.style.left = "auto";
-      item.node.style.width = "auto";
       item.node.style.marginBottom = "8px";
       historyList.appendChild(item.node);
       historyItems.push(item);
     }
     sentItems.length = 0;
     renderHistoryGroup();
-    layoutBubbles();
   }
 
   function updateSendAllLabel() {
@@ -398,43 +381,31 @@ export function renderClientScript(): string {
   }
 
   function targetAnchorY(target) {
+    // Purely a sort key now (reading-order position at creation time), not a
+    // pixel coordinate anything gets positioned at — bubbles live in normal
+    // document flow inside #rail-scroll, ordered by this value, not placed
+    // at an absolute Y. Keeps the "roughly near its source, top to bottom"
+    // correlation the rail is meant to preserve, without pixel-exact
+    // alignment (which stopped being viable the moment scrolling was added:
+    // with many comments, pixel alignment and a working scrollbar can't
+    // both hold at once).
     var rect = target.getBoundingClientRect();
     var frameRect = frame.getBoundingClientRect();
     return frameRect.top + rect.top;
   }
 
   function layoutBubbles() {
-    // Horizontal placement is derived from the rail's live boundingClientRect
-    // on every call (not cached at creation time) so it stays correct across
-    // resize/collapse without a separate sync path — layoutBubbles() already
-    // runs after every mutation that could need repositioning.
-    var railRect = commentRail.getBoundingClientRect();
-    var bubbleLeft = railRect.left + 12;
-    var bubbleWidth = Math.max(0, railRect.width - 24);
-
-    historyContainer.style.left = bubbleLeft + "px";
-    historyContainer.style.width = bubbleWidth + "px";
-
-    // sentItems participate too (same fixed-position stacking as queue) —
-    // only historyItems are excluded, since those already moved into the
-    // separate, non-fixed history container on the last reload.
-    var all = queue.concat(sentItems).map(function (q) {
-      return { node: q.node, anchorY: q.anchorY };
-    });
-    if (draftBubble) {
-      all.push({ node: draftBubble.node, anchorY: draftBubble.anchorY });
-    }
+    // Sort by reading-order position, then re-append in that order — append
+    // on an already-attached node reorders it. Horizontal placement and
+    // spacing are pure CSS (.bubble's left/right/margin-bottom); the
+    // rail's own overflow-y: auto handles anything that doesn't fit.
+    var all = queue.concat(sentItems);
+    if (draftBubble) all.push(draftBubble);
     all.sort(function (a, b) {
       return a.anchorY - b.anchorY;
     });
-    var historyHeight = historyItems.length > 0 ? historyContainer.offsetHeight + 8 : 0;
-    var cursor = 48 + historyHeight;
     for (var i = 0; i < all.length; i++) {
-      all[i].node.style.left = bubbleLeft + "px";
-      all[i].node.style.width = bubbleWidth + "px";
-      var top = Math.max(all[i].anchorY, cursor);
-      all[i].node.style.top = top + "px";
-      cursor = top + all[i].node.offsetHeight + 8;
+      railScroll.appendChild(all[i].node);
     }
   }
 
@@ -523,18 +494,15 @@ export function renderClientScript(): string {
   function createBubbleShell() {
     var node = document.createElement("div");
     node.className = "bubble";
-    node.style.position = "fixed";
-    // left/width set by layoutBubbles(), called right after this returns.
     node.style.background = "#fff";
     node.style.border = "1px solid #e3e5e9";
     node.style.borderRadius = "8px";
     node.style.padding = "10px 12px";
     node.style.boxShadow = "0 1px 4px rgba(20,24,33,.08)";
-    node.style.pointerEvents = "auto";
     node.style.fontSize = "13px";
     node.style.boxSizing = "border-box";
-    node.style.zIndex = "900";
-    document.body.appendChild(node);
+    node.style.marginBottom = "8px";
+    railScroll.appendChild(node);
     return node;
   }
 

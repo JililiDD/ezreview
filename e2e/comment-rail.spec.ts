@@ -110,3 +110,54 @@ test("dragging the rail grip resizes the rail and repositions bubbles to match",
   expect(bubbleBox!.x).toBeGreaterThanOrEqual(railBoxAfter!.x - 1);
   expect(bubbleBox!.x + bubbleBox!.width).toBeLessThanOrEqual(railBoxAfter!.x + railBoxAfter!.width + 1);
 });
+
+test("many queued comments overflow the rail's visible height and the rail scrolls to reach them", async ({ page }) => {
+  const manyDir = mkdtempSync(join(tmpdir(), "ai-review-board-comment-rail-many-e2e-"));
+  const artifactPath = join(manyDir, "demo.html");
+  copyFileSync(join(import.meta.dirname, "fixtures", "many-elements.html"), artifactPath);
+  const manyHandle = await startReviewServer({ artifactPath, basePort: 6020 });
+
+  try {
+    await page.goto(manyHandle.url);
+    const frame = page.frameLocator("#artifact-frame");
+    for (let i = 0; i < 30; i++) {
+      await frame.locator("#item-" + i).click();
+      await page.locator(".bubble-draft textarea").fill("a fairly long comment about item number " + i + " to give each bubble real height");
+      await page.locator(".bubble-draft .bubble-add").click();
+    }
+
+    await expect(page.locator(".bubble")).toHaveCount(30);
+
+    // With 30 real bubbles this must overflow on any reasonable viewport —
+    // if it doesn't, the rail silently grew instead of staying scrollable,
+    // and the original bug (content cut off with no way to reach it) is
+    // back. Checked via actually moving scrollTop and confirming it took
+    // effect, not just comparing scrollHeight/clientHeight once — proves the
+    // element is a genuinely functioning scroll container, not merely
+    // "numerically taller than its box while something else prevents
+    // scrolling it" (position/overflow oddity, wrong ancestor, etc).
+    const before = await page.locator("#rail-scroll").evaluate((el) => ({
+      scrollHeight: el.scrollHeight,
+      clientHeight: el.clientHeight,
+    }));
+    expect(before.scrollHeight).toBeGreaterThan(before.clientHeight);
+
+    // Auto-scroll from focusing the newest bubble's textarea may have already
+    // moved scrollTop, so don't assume a starting value — just confirm the
+    // element actually responds to being scrolled, in both directions.
+    const scrolledToBottom = await page.locator("#rail-scroll").evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+      return el.scrollTop;
+    });
+    expect(scrolledToBottom).toBeGreaterThan(before.clientHeight);
+
+    const scrolledToTop = await page.locator("#rail-scroll").evaluate((el) => {
+      el.scrollTop = 0;
+      return el.scrollTop;
+    });
+    expect(scrolledToTop).toBe(0);
+  } finally {
+    await manyHandle.close();
+    rmSync(manyDir, { recursive: true, force: true });
+  }
+});
