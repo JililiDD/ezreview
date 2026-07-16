@@ -1,0 +1,12 @@
+<!doctype html>
+<html>
+<body>
+  <div id="shadow-host"></div>
+  <script>
+    var host = document.getElementById("shadow-host");
+    var root = host.attachShadow({ mode: "open" });
+    root.innerHTML =
+      '<div><span>a</span><span>b</span><button>click me</button></div>';
+  </script>
+</body>
+</html>

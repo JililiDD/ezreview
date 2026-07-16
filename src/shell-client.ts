@@ -25,6 +25,69 @@ export function renderClientScript(): string {
     frame.src = "/artifact?t=" + Date.now();
   });
 
+  // ---- Selector generator (self-authored, D-001) ----
+
+  function cssEscape(value) {
+    if (window.CSS && window.CSS.escape) return window.CSS.escape(value);
+    return String(value).replace(/[^a-zA-Z0-9_-]/g, "\\\\$&");
+  }
+
+  function buildSegment(node) {
+    var tag = node.tagName.toLowerCase();
+    var parent = node.parentElement;
+    if (!parent) return tag;
+    var siblings = [];
+    for (var i = 0; i < parent.children.length; i++) {
+      if (parent.children[i].tagName === node.tagName) siblings.push(parent.children[i]);
+    }
+    var index = siblings.indexOf(node) + 1;
+    return tag + ":nth-of-type(" + index + ")";
+  }
+
+  function buildPathWithinRoot(el, root) {
+    var segments = [];
+    var node = el;
+    while (node && node.nodeType === 1) {
+      if (node.id) {
+        segments.unshift("#" + cssEscape(node.id));
+        break;
+      }
+      segments.unshift(buildSegment(node));
+      if (node === root) break;
+      node = node.parentElement;
+      if (!node) break;
+    }
+    for (var i = segments.length - 1; i >= 0; i--) {
+      var candidate = segments.slice(i).join(" > ");
+      var matches = root.querySelectorAll(candidate);
+      if (matches.length === 1 && matches[0] === el) {
+        return candidate;
+      }
+    }
+    return segments.join(" > ");
+  }
+
+  function generateSelector(el) {
+    if (el.id) {
+      return { selector: "#" + cssEscape(el.id), shadowHost: null };
+    }
+    var rootNode = el.getRootNode();
+    // duck-typed, not "instanceof ShadowRoot": rootNode may come from the
+    // iframe's own realm, whose ShadowRoot constructor differs from this
+    // window's, so a cross-realm instanceof check silently fails here.
+    var isShadow = rootNode.nodeType === 11 && !!rootNode.host;
+    if (!isShadow) {
+      return { selector: buildPathWithinRoot(el, document), shadowHost: null };
+    }
+    var hostResult = generateSelector(rootNode.host);
+    return {
+      selector: buildPathWithinRoot(el, rootNode),
+      shadowHost: hostResult.selector,
+    };
+  }
+
+  window.__generateSelector = generateSelector;
+
   // ---- Review overlay: hover highlight ----
 
   var reviewOn = reviewSwitch.getAttribute("data-on") === "true";
@@ -39,6 +102,19 @@ export function renderClientScript(): string {
   highlightBox.style.display = "none";
   highlightBox.style.boxSizing = "border-box";
   document.body.appendChild(highlightBox);
+
+  var selectorLabel = document.createElement("div");
+  selectorLabel.id = "selector-label";
+  selectorLabel.style.position = "fixed";
+  selectorLabel.style.background = "var(--chrome-bg)";
+  selectorLabel.style.color = "var(--chrome-fg)";
+  selectorLabel.style.font = "11px ui-monospace, Consolas, monospace";
+  selectorLabel.style.padding = "2px 6px";
+  selectorLabel.style.borderRadius = "4px";
+  selectorLabel.style.pointerEvents = "none";
+  selectorLabel.style.zIndex = "1001";
+  selectorLabel.style.display = "none";
+  document.body.appendChild(selectorLabel);
 
   function getIframeDoc() {
     try {
@@ -55,15 +131,26 @@ export function renderClientScript(): string {
     }
     var rect = target.getBoundingClientRect();
     var frameRect = frame.getBoundingClientRect();
-    highlightBox.style.left = frameRect.left + rect.left + "px";
-    highlightBox.style.top = frameRect.top + rect.top + "px";
+    var left = frameRect.left + rect.left;
+    var top = frameRect.top + rect.top;
+    highlightBox.style.left = left + "px";
+    highlightBox.style.top = top + "px";
     highlightBox.style.width = rect.width + "px";
     highlightBox.style.height = rect.height + "px";
     highlightBox.style.display = "block";
+
+    var result = generateSelector(target);
+    selectorLabel.textContent = result.shadowHost
+      ? result.shadowHost + " ⇒ " + result.selector
+      : result.selector;
+    selectorLabel.style.left = left + "px";
+    selectorLabel.style.top = Math.max(0, top - 20) + "px";
+    selectorLabel.style.display = "block";
   }
 
   function hideHighlight() {
     highlightBox.style.display = "none";
+    selectorLabel.style.display = "none";
   }
 
   function refreshHighlightPosition() {

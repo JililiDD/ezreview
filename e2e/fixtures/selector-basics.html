@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<body>
+  <div>
+    <span>x</span>
+    <span id="has-id">y</span>
+    <span>z</span>
+  </div>
+  <ul>
+    <li>one</li>
+    <li>two</li>
+    <li>three</li>
+  </ul>
+  <!--
+    Two structurally identical 6-level chains, two same-tag siblings per
+    level. Every level needs nth-of-type (no bare-tag shortcut anywhere),
+    and short suffixes collide across the two branches, forcing the
+    selector generator to climb the full chain before finding uniqueness.
+  -->
+  <div class="branch-wrap">
+    <div>
+      <div><p>branch A leaf</p><p>branch A leaf sibling</p></div>
+      <div><p>branch A leaf</p><p>branch A leaf sibling</p></div>
+    </div>
+    <div>
+      <div><p>branch A leaf</p><p>branch A leaf sibling</p></div>
+      <div><p>branch A leaf</p><p>branch A leaf sibling</p></div>
+    </div>
+  </div>
+  <div class="branch-wrap">
+    <div>
+      <div><p>branch B leaf</p><p>branch B leaf sibling</p></div>
+      <div><p>branch B leaf</p><p>branch B leaf sibling</p></div>
+    </div>
+    <div>
+      <div><p>branch B leaf</p><p>branch B leaf sibling</p></div>
+      <div><p>deep, no id, distinguishable only by its full ancestor chain</p><p>branch B leaf sibling</p></div>
+    </div>
+  </div>
+</body>
+</html>
