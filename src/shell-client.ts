@@ -22,6 +22,16 @@ export function renderClientScript(): string {
   source.addEventListener("reload", function () {
     currentHoverTarget = null;
     hideHighlight();
+    markTextAnnotationsLost();
+    if (pendingSelectionRange || draftBubble) {
+      hideAddCommentButton();
+      closeDraftBubble();
+      statusText.textContent = "Selection cleared — please reselect";
+      window.setTimeout(function () {
+        if (dot.classList.contains("disconnected")) return;
+        statusText.textContent = "";
+      }, 3000);
+    }
     frame.src = "/artifact?t=" + Date.now();
   });
 
@@ -179,10 +189,96 @@ export function renderClientScript(): string {
     hideHighlight();
   }
 
+  // ---- Text-selection annotation (always active, independent of Review toggle) ----
+
+  function getIframeWindow() {
+    try {
+      return frame.contentWindow;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  var HIGHLIGHT_NAME = "ai-review-text";
+  var HIGHLIGHT_HOVER_NAME = "ai-review-text-hover";
+  var textHighlightSet = null;
+  var textHighlightHoverSet = null;
+
+  function setupTextHighlightRegistry() {
+    var win = getIframeWindow();
+    var doc = getIframeDoc();
+    if (!win || !doc || !win.Highlight || !win.CSS || !win.CSS.highlights) return;
+
+    var style = doc.createElement("style");
+    style.textContent =
+      "::highlight(" + HIGHLIGHT_NAME + ") { background-color: rgba(255,204,0,.35); }" +
+      "::highlight(" + HIGHLIGHT_HOVER_NAME + ") { background-color: rgba(255,204,0,.6); }";
+    doc.head.appendChild(style);
+
+    textHighlightSet = new win.Highlight();
+    textHighlightHoverSet = new win.Highlight();
+    win.CSS.highlights.set(HIGHLIGHT_NAME, textHighlightSet);
+    win.CSS.highlights.set(HIGHLIGHT_HOVER_NAME, textHighlightHoverSet);
+  }
+
+  var addCommentButton = document.createElement("button");
+  addCommentButton.id = "add-comment-button";
+  addCommentButton.textContent = "+ Add comment";
+  addCommentButton.style.position = "fixed";
+  addCommentButton.style.background = "var(--chrome-bg)";
+  addCommentButton.style.color = "#fff";
+  addCommentButton.style.border = "none";
+  addCommentButton.style.borderRadius = "6px";
+  addCommentButton.style.padding = "6px 10px";
+  addCommentButton.style.fontSize = "12.5px";
+  addCommentButton.style.cursor = "pointer";
+  addCommentButton.style.zIndex = "1002";
+  addCommentButton.style.display = "none";
+  document.body.appendChild(addCommentButton);
+
+  var pendingSelectionRange = null;
+
+  function hideAddCommentButton() {
+    addCommentButton.style.display = "none";
+    pendingSelectionRange = null;
+  }
+
+  function showAddCommentButton(range) {
+    var rect = range.getBoundingClientRect();
+    var frameRect = frame.getBoundingClientRect();
+    addCommentButton.style.left = frameRect.left + rect.right - 120 + "px";
+    addCommentButton.style.top = frameRect.top + rect.top - 28 + "px";
+    addCommentButton.style.display = "block";
+    pendingSelectionRange = range;
+  }
+
+  function onIframeMouseUp() {
+    var doc = getIframeDoc();
+    var sel = doc && doc.getSelection ? doc.getSelection() : null;
+    if (sel && sel.toString().length > 0 && sel.rangeCount > 0) {
+      showAddCommentButton(sel.getRangeAt(0).cloneRange());
+    } else {
+      hideAddCommentButton();
+    }
+  }
+
+  addCommentButton.addEventListener("click", function () {
+    if (pendingSelectionRange) openTextDraftBubble(pendingSelectionRange);
+    hideAddCommentButton();
+  });
+
+  function attachSelectionListeners() {
+    var doc = getIframeDoc();
+    if (!doc) return;
+    doc.addEventListener("mouseup", onIframeMouseUp);
+    setupTextHighlightRegistry();
+  }
+
   // ---- Bubble queue (draft -> queue -> delete; Send all is a placeholder) ----
 
   var sendAllButton = document.getElementById("send-all");
   var queue = [];
+  window.__annotationQueue = queue;
   var draftBubble = null;
   var nextQueueId = 1;
 
@@ -271,9 +367,20 @@ export function renderClientScript(): string {
 
   function closeDraftBubble() {
     if (!draftBubble) return;
+    if (draftBubble.type === "text-annotation" && textHighlightSet) {
+      textHighlightSet.delete(draftBubble.range);
+    }
     draftBubble.node.remove();
     draftBubble = null;
     layoutBubbles();
+  }
+
+  function markTextAnnotationsLost() {
+    for (var i = 0; i < queue.length; i++) {
+      if (queue[i].type === "text-annotation") {
+        queue[i].lost = true;
+      }
+    }
   }
 
   function addDraftToQueue() {
@@ -292,40 +399,83 @@ export function renderClientScript(): string {
     node.appendChild(deleteBtn);
 
     var id = "a-" + nextQueueId++;
-    var item = {
-      id: id,
-      node: node,
-      anchorY: draftBubble.anchorY,
-      selector: draftBubble.selResult.selector,
-      shadowHost: draftBubble.selResult.shadowHost,
-      comment: comment,
-      target: draftBubble.target,
-    };
+    var item;
+    if (draftBubble.type === "text-annotation") {
+      item = {
+        id: id,
+        node: node,
+        anchorY: draftBubble.anchorY,
+        type: "text-annotation",
+        selectedText: draftBubble.selectedText,
+        context: draftBubble.context,
+        nearestSelector: draftBubble.nearestSelectorResult.selector,
+        shadowHost: draftBubble.nearestSelectorResult.shadowHost,
+        comment: comment,
+        range: draftBubble.range,
+        lost: false,
+      };
+    } else {
+      item = {
+        id: id,
+        node: node,
+        anchorY: draftBubble.anchorY,
+        type: "element-annotation",
+        selector: draftBubble.selResult.selector,
+        shadowHost: draftBubble.selResult.shadowHost,
+        comment: comment,
+        target: draftBubble.target,
+      };
+    }
     queue.push(item);
     node.setAttribute("data-annotation-id", id);
 
     deleteBtn.addEventListener("click", function () {
+      if (item.type === "text-annotation" && textHighlightSet) {
+        textHighlightSet.delete(item.range);
+        textHighlightHoverSet.delete(item.range);
+      }
       removeFromQueue(id);
     });
 
-    node.addEventListener("mouseenter", function () {
-      // Defensive: if the iframe's own scroll-triggered highlight refresh
-      // still holds a stale currentHoverTarget when scrollIntoView below
-      // causes a real scroll, don't let it clobber this highlight.
-      currentHoverTarget = null;
-      var el = resolveAnnotationElement(item);
-      if (el) {
+    if (item.type === "text-annotation") {
+      node.addEventListener("mouseenter", function () {
+        if (item.lost) {
+          setAnchorLost(node, true);
+          return;
+        }
         setAnchorLost(node, false);
-        positionHighlight(el);
-        if (el.scrollIntoView) el.scrollIntoView({ block: "center" });
-      } else {
-        setAnchorLost(node, true);
+        if (textHighlightSet && textHighlightHoverSet) {
+          textHighlightSet.delete(item.range);
+          textHighlightHoverSet.add(item.range);
+        }
+      });
+      node.addEventListener("mouseleave", function () {
+        if (item.lost) return;
+        if (textHighlightSet && textHighlightHoverSet) {
+          textHighlightHoverSet.delete(item.range);
+          textHighlightSet.add(item.range);
+        }
+      });
+    } else {
+      node.addEventListener("mouseenter", function () {
+        // Defensive: if the iframe's own scroll-triggered highlight refresh
+        // still holds a stale currentHoverTarget when scrollIntoView below
+        // causes a real scroll, don't let it clobber this highlight.
+        currentHoverTarget = null;
+        var el = resolveAnnotationElement(item);
+        if (el) {
+          setAnchorLost(node, false);
+          positionHighlight(el);
+          if (el.scrollIntoView) el.scrollIntoView({ block: "center" });
+        } else {
+          setAnchorLost(node, true);
+          hideHighlight();
+        }
+      });
+      node.addEventListener("mouseleave", function () {
         hideHighlight();
-      }
-    });
-    node.addEventListener("mouseleave", function () {
-      hideHighlight();
-    });
+      });
+    }
 
     draftBubble = null;
     updateSendAllLabel();
@@ -373,8 +523,97 @@ export function renderClientScript(): string {
     draftBubble = {
       node: node,
       anchorY: targetAnchorY(target),
+      type: "element-annotation",
       target: target,
       selResult: selResult,
+      textarea: textarea,
+    };
+
+    addBtn.addEventListener("click", addDraftToQueue);
+    cancelBtn.addEventListener("click", closeDraftBubble);
+
+    layoutBubbles();
+  }
+
+  function nearestElementAncestor(node) {
+    while (node && node.nodeType !== 1) {
+      node = node.parentNode;
+    }
+    return node;
+  }
+
+  function getTextContext(range) {
+    // Climb to an ancestor with enough surrounding text, then build
+    // before/after ranges via native Range semantics (start-of-ancestor to
+    // selection-start, and selection-end to end-of-ancestor). This handles
+    // both text-node and element-boundary containers uniformly — Range's
+    // own toString() flattens across element boundaries correctly, which a
+    // manual sibling-walk over startContainer's own children would not
+    // (that fails when the selection starts/ends exactly at a child index
+    // with nothing earlier *inside* that same container).
+    var ancestorEl = range.commonAncestorContainer;
+    if (ancestorEl.nodeType !== 1) ancestorEl = ancestorEl.parentElement;
+    while (ancestorEl && ancestorEl.parentElement && ancestorEl.textContent.length < 200) {
+      ancestorEl = ancestorEl.parentElement;
+    }
+    if (!ancestorEl) return { before: "", after: "" };
+
+    var beforeRange = range.cloneRange();
+    beforeRange.collapse(true);
+    beforeRange.setStart(ancestorEl, 0);
+    var beforeText = beforeRange.toString();
+
+    var afterRange = range.cloneRange();
+    afterRange.collapse(false);
+    afterRange.setEnd(ancestorEl, ancestorEl.childNodes.length);
+    var afterText = afterRange.toString();
+
+    return {
+      before: beforeText.slice(-50),
+      after: afterText.slice(0, 50),
+    };
+  }
+
+  function openTextDraftBubble(range) {
+    if (draftBubble) closeDraftBubble();
+
+    var selectedText = range.toString();
+    var context = getTextContext(range);
+    var ancestorEl = nearestElementAncestor(range.commonAncestorContainer);
+    var nearestSelectorResult = ancestorEl ? generateSelector(ancestorEl) : { selector: null, shadowHost: null };
+
+    if (textHighlightSet) textHighlightSet.add(range);
+
+    var node = createBubbleShell();
+    node.className = "bubble bubble-draft";
+
+    var textarea = document.createElement("textarea");
+    textarea.style.width = "100%";
+    textarea.style.boxSizing = "border-box";
+    textarea.rows = 3;
+
+    var addBtn = document.createElement("button");
+    addBtn.className = "bubble-add";
+    addBtn.textContent = "Add to queue";
+    var cancelBtn = document.createElement("button");
+    cancelBtn.className = "bubble-cancel";
+    cancelBtn.textContent = "Cancel";
+
+    node.appendChild(textarea);
+    node.appendChild(addBtn);
+    node.appendChild(cancelBtn);
+
+    var rect = range.getBoundingClientRect();
+    var frameRect = frame.getBoundingClientRect();
+
+    draftBubble = {
+      node: node,
+      anchorY: frameRect.top + rect.top,
+      type: "text-annotation",
+      range: range,
+      selectedText: selectedText,
+      context: context,
+      nearestSelectorResult: nearestSelectorResult,
       textarea: textarea,
     };
 
@@ -424,8 +663,10 @@ export function renderClientScript(): string {
 
   frame.addEventListener("load", function () {
     if (reviewOn) attachOverlayListeners();
+    attachSelectionListeners();
   });
   if (reviewOn) attachOverlayListeners();
+  attachSelectionListeners();
 
   reviewSwitch.addEventListener("click", function () {
     reviewOn = !reviewOn;
