@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { renderShellPage } from "./shell.js";
 import { SseHub } from "./sse.js";
 import { watchArtifactFile } from "./watcher.js";
+import { watchForIdle, DEFAULT_IDLE_TIMEOUT_MS } from "./idle-exit.js";
 
 export const DEFAULT_HOST = "127.0.0.1";
 export const BASE_PORT = 4400;
@@ -13,6 +14,7 @@ export interface ReviewServerOptions {
   artifactPath: string;
   host?: string;
   basePort?: number;
+  idleTimeoutMs?: number;
 }
 
 export interface ReviewServerHandle {
@@ -142,18 +144,27 @@ export async function startReviewServer(options: ReviewServerOptions): Promise<R
     sseHub.broadcast("reload", { timestamp: Date.now() });
   });
 
+  function close(): Promise<void> {
+    idleHandle.stop();
+    watcherHandle.close();
+    sseHub.closeAll();
+    // Backstop for a connection accepted just before closeAll() ran but not yet registered.
+    server.closeAllConnections();
+    return new Promise((resolvePromise, reject) => {
+      server.close((err) => (err ? reject(err) : resolvePromise()));
+    });
+  }
+
+  const idleHandle = watchForIdle(sseHub, options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS, () => {
+    close().catch(() => {});
+  });
+
   return {
     server,
     port,
     host,
     url: `http://${host}:${port}/`,
     sseHub,
-    close(): Promise<void> {
-      watcherHandle.close();
-      sseHub.closeAll();
-      return new Promise((resolvePromise, reject) => {
-        server.close((err) => (err ? reject(err) : resolvePromise()));
-      });
-    },
+    close,
   };
 }

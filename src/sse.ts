@@ -1,14 +1,22 @@
+import { EventEmitter } from "node:events";
 import type { ServerResponse } from "node:http";
 
-export class SseHub {
+export class SseHub extends EventEmitter {
   private readonly clients = new Set<ServerResponse>();
 
   register(res: ServerResponse): void {
+    const wasEmpty = this.clients.size === 0;
     this.clients.add(res);
+    if (wasEmpty) {
+      this.emit("connected");
+    }
   }
 
   unregister(res: ServerResponse): void {
-    this.clients.delete(res);
+    const had = this.clients.delete(res);
+    if (had && this.clients.size === 0) {
+      this.emit("empty");
+    }
   }
 
   get size(): number {
