@@ -5,6 +5,8 @@ import { renderShellPage } from "./shell.js";
 import { SseHub } from "./sse.js";
 import { watchArtifactFile } from "./watcher.js";
 import { watchForIdle, DEFAULT_IDLE_TIMEOUT_MS } from "./idle-exit.js";
+import { appendBatch } from "./feedback-queue.js";
+import { sessionDirFor } from "./session.js";
 
 export const DEFAULT_HOST = "127.0.0.1";
 export const BASE_PORT = 4400;
@@ -15,6 +17,7 @@ export interface ReviewServerOptions {
   host?: string;
   basePort?: number;
   idleTimeoutMs?: number;
+  sessionDir?: string;
 }
 
 export interface ReviewServerHandle {
@@ -26,7 +29,23 @@ export interface ReviewServerHandle {
   close(): Promise<void>;
 }
 
-export function createRequestHandler(artifactPath: string, sseHub: SseHub) {
+function readJsonBody(req: IncomingMessage): Promise<unknown> {
+  return new Promise((resolvePromise, reject) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => {
+      try {
+        const raw = Buffer.concat(chunks).toString("utf-8");
+        resolvePromise(raw.length ? JSON.parse(raw) : undefined);
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+export function createRequestHandler(artifactPath: string, sseHub: SseHub, sessionDir: string) {
   const absoluteArtifactPath = resolve(artifactPath);
 
   return function handler(req: IncomingMessage, res: ServerResponse): void {
@@ -71,6 +90,28 @@ export function createRequestHandler(artifactPath: string, sseHub: SseHub) {
       };
       req.on("close", cleanup);
       res.on("error", cleanup);
+      return;
+    }
+
+    if (pathname === "/feedback" && req.method === "POST") {
+      readJsonBody(req)
+        .then((body) => {
+          const isValidBatch =
+            Array.isArray(body) && body.every((item) => item && typeof item === "object" && "id" in item);
+          if (!isValidBatch) {
+            res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ error: "expected an array of annotation items, each with an id" }));
+            return;
+          }
+          appendBatch(sessionDir, body as unknown[]);
+          sseHub.broadcast("feedback", {});
+          res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ ok: true }));
+        })
+        .catch(() => {
+          res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ error: "invalid JSON body" }));
+        });
       return;
     }
 
@@ -135,8 +176,9 @@ export async function checkHealthz(baseUrl: string, timeoutMs = 500): Promise<He
 export async function startReviewServer(options: ReviewServerOptions): Promise<ReviewServerHandle> {
   const host = options.host ?? DEFAULT_HOST;
   const basePort = options.basePort ?? BASE_PORT;
+  const sessionDir = options.sessionDir ?? sessionDirFor(options.artifactPath);
   const sseHub = new SseHub();
-  const handler = createRequestHandler(options.artifactPath, sseHub);
+  const handler = createRequestHandler(options.artifactPath, sseHub, sessionDir);
   const server = createHttpServer(handler);
   const port = await listenOnAvailablePort(server, host, basePort);
 

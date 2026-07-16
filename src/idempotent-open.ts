@@ -29,7 +29,7 @@ export async function openIdempotently(
     }
   }
 
-  const handle = await startReviewServer({ artifactPath: file, host, basePort: opts.basePort });
+  const handle = await startReviewServer({ artifactPath: file, host, basePort: opts.basePort, sessionDir: dir });
   writeSessionInfo(dir, { port: handle.port, pid: process.pid, file: normalizedFile });
   return { url: handle.url, reused: false, handle };
 }
