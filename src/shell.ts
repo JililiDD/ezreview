@@ -1,3 +1,5 @@
+import { renderClientScript } from "./shell-client.js";
+
 export function renderShellPage(): string {
   return `<!doctype html>
 <html lang="en">
@@ -11,6 +13,7 @@ export function renderShellPage(): string {
     --chrome-fg: #b8bcc4;
     --chrome-dim: #6f7480;
     --accent: #4f8ef7;
+    --accent-soft: rgba(79, 142, 247, 0.12);
     --stage-bg: #f6f7f9;
     --ok-green: #3ecf7a;
     --disconnect-red: #e05a4f;
@@ -133,30 +136,7 @@ export function renderShellPage(): string {
   <div id="stage">
     <iframe id="artifact-frame" src="/artifact"></iframe>
   </div>
-  <script>
-    (function () {
-      var dot = document.getElementById("status-dot");
-      var statusText = document.getElementById("status-text");
-      var frame = document.getElementById("artifact-frame");
-
-      function setConnected() {
-        dot.classList.remove("disconnected");
-        statusText.textContent = "";
-      }
-
-      function setDisconnected() {
-        dot.classList.add("disconnected");
-        statusText.textContent = "Disconnected · retrying…";
-      }
-
-      var source = new EventSource("/events");
-      source.onopen = setConnected;
-      source.onerror = setDisconnected;
-      source.addEventListener("reload", function () {
-        frame.src = "/artifact?t=" + Date.now();
-      });
-    })();
-  </script>
+  <script>${renderClientScript()}</script>
 </body>
 </html>
 `;
