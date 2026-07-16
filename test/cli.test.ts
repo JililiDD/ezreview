@@ -6,22 +6,45 @@ import { join } from "node:path";
 import { parseCliArgs, validateArtifactFile, CliError, main, openReview } from "../src/cli.js";
 
 describe("parseCliArgs", () => {
-  test("parses --help with no file", () => {
-    const parsed = parseCliArgs(["--help"]);
-    assert.equal(parsed.help, true);
-    assert.equal(parsed.file, undefined);
+  test("parses --help", () => {
+    assert.deepEqual(parseCliArgs(["--help"]), { kind: "help" });
   });
 
-  test("parses a file positional", () => {
-    const parsed = parseCliArgs(["demo.html"]);
-    assert.equal(parsed.help, false);
-    assert.equal(parsed.file, "demo.html");
+  test("parses a bare file positional as open", () => {
+    assert.deepEqual(parseCliArgs(["demo.html"]), { kind: "open", file: "demo.html" });
   });
 
-  test("no arguments yields no file and no help", () => {
+  test("no arguments yields an error", () => {
     const parsed = parseCliArgs([]);
-    assert.equal(parsed.help, false);
-    assert.equal(parsed.file, undefined);
+    assert.equal(parsed.kind, "error");
+  });
+
+  test("parses wait <file>", () => {
+    assert.deepEqual(parseCliArgs(["wait", "demo.html"]), { kind: "wait", file: "demo.html" });
+  });
+
+  test("wait with no file yields an error", () => {
+    const parsed = parseCliArgs(["wait"]);
+    assert.equal(parsed.kind, "error");
+  });
+
+  test("parses reply <file> --to <id> <text>", () => {
+    assert.deepEqual(parseCliArgs(["reply", "demo.html", "--to", "a-1", "looks good"]), {
+      kind: "reply",
+      file: "demo.html",
+      to: "a-1",
+      text: "looks good",
+    });
+  });
+
+  test("reply without --to yields an error", () => {
+    const parsed = parseCliArgs(["reply", "demo.html", "some text"]);
+    assert.equal(parsed.kind, "error");
+  });
+
+  test("reply without text yields an error", () => {
+    const parsed = parseCliArgs(["reply", "demo.html", "--to", "a-1"]);
+    assert.equal(parsed.kind, "error");
   });
 });
 
