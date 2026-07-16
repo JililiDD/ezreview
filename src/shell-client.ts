@@ -359,7 +359,10 @@ export function renderClientScript(): string {
   }
 
   function layoutBubbles() {
-    var all = queue.map(function (q) {
+    // sentItems participate too (same fixed-position stacking as queue) —
+    // only historyItems are excluded, since those already moved into the
+    // separate, non-fixed history container on the last reload.
+    var all = queue.concat(sentItems).map(function (q) {
       return { node: q.node, anchorY: q.anchorY };
     });
     if (draftBubble) {

@@ -135,6 +135,40 @@ test("hover linkage still works on a sent element-annotation bubble (regression)
   }
 });
 
+test("a sent bubble keeps its stacking slot: a newly queued bubble near the same anchor does not overlap it", async ({
+  page,
+}) => {
+  const { dir, handle } = await startWithFixture("bubble-queue.html", 5845);
+  try {
+    await page.goto(handle.url);
+    const frame = page.frameLocator("#artifact-frame");
+
+    await frame.locator("#near-top").click();
+    await page.locator(".bubble-draft textarea").fill("first");
+    await page.locator(".bubble-draft .bubble-add").click();
+    await page.locator("#send-all").click();
+    await expect(page.locator(".bubble-sent")).toBeVisible();
+
+    // no reload happened — the sent bubble must still occupy its stacking
+    // slot when a second, nearby annotation is queued
+    await frame.locator("#near-top-2").click();
+    await page.locator(".bubble-draft textarea").fill("second");
+    await page.locator(".bubble-draft .bubble-add").click();
+
+    const bubbles = page.locator(".bubble");
+    await expect(bubbles).toHaveCount(2);
+    const sentBox = await page.locator(".bubble-sent").boundingBox();
+    const queuedBox = await page.locator(".bubble:not(.bubble-sent)").boundingBox();
+    expect(sentBox).not.toBeNull();
+    expect(queuedBox).not.toBeNull();
+    const noOverlap =
+      sentBox!.y + sentBox!.height <= queuedBox!.y + 1 || queuedBox!.y + queuedBox!.height <= sentBox!.y + 1;
+    expect(noOverlap).toBe(true);
+  } finally {
+    await cleanup(dir, handle);
+  }
+});
+
 test("a failed submission (non-ok response) surfaces an error and leaves the queue intact", async ({ page }) => {
   const { dir, handle } = await startWithFixture("bubble-queue.html", 5840);
   try {
