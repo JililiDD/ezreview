@@ -212,6 +212,42 @@ export function renderClientScript(): string {
     }
   }
 
+  function resolveAnnotationElement(item) {
+    var doc = getIframeDoc();
+    if (!doc) return null;
+    try {
+      if (item.shadowHost) {
+        var host = doc.querySelector(item.shadowHost);
+        if (!host || !host.shadowRoot) return null;
+        return host.shadowRoot.querySelector(item.selector);
+      }
+      return doc.querySelector(item.selector);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function setAnchorLost(node, lost) {
+    var badge = node.querySelector(".anchor-lost-badge");
+    if (lost) {
+      if (!badge) {
+        badge = document.createElement("span");
+        badge.className = "anchor-lost-badge";
+        badge.textContent = "⚠ Anchor lost";
+        badge.style.display = "inline-block";
+        badge.style.marginTop = "4px";
+        badge.style.padding = "1px 6px";
+        badge.style.borderRadius = "4px";
+        badge.style.fontSize = "11px";
+        badge.style.color = "var(--stale-amber-fg)";
+        badge.style.background = "var(--stale-amber-bg)";
+        node.appendChild(badge);
+      }
+    } else if (badge) {
+      badge.remove();
+    }
+  }
+
   function createBubbleShell() {
     var node = document.createElement("div");
     node.className = "bubble";
@@ -268,6 +304,25 @@ export function renderClientScript(): string {
 
     deleteBtn.addEventListener("click", function () {
       removeFromQueue(id);
+    });
+
+    node.addEventListener("mouseenter", function () {
+      // Defensive: if the iframe's own scroll-triggered highlight refresh
+      // still holds a stale currentHoverTarget when scrollIntoView below
+      // causes a real scroll, don't let it clobber this highlight.
+      currentHoverTarget = null;
+      var el = resolveAnnotationElement(item);
+      if (el) {
+        setAnchorLost(node, false);
+        positionHighlight(el);
+        if (el.scrollIntoView) el.scrollIntoView({ block: "center" });
+      } else {
+        setAnchorLost(node, true);
+        hideHighlight();
+      }
+    });
+    node.addEventListener("mouseleave", function () {
+      hideHighlight();
     });
 
     draftBubble = null;

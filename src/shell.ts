@@ -17,6 +17,8 @@ export function renderShellPage(): string {
     --stage-bg: #f6f7f9;
     --ok-green: #3ecf7a;
     --disconnect-red: #e05a4f;
+    --stale-amber-fg: #9a6b1f;
+    --stale-amber-bg: #faf0dc;
   }
   html, body {
     margin: 0;
