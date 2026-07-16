@@ -185,4 +185,39 @@ test.describe("selector generator (D-001)", () => {
       await cleanup(dir, handle);
     }
   });
+
+  test("an id-bearing element inside a shadow root still gets a resolvable shadowHost (not null)", async ({ page }) => {
+    const { dir, handle } = await startWithFixture("selector-shadow-dom.html", 4960);
+    try {
+      await page.goto(handle.url);
+
+      const result = await page.evaluate(() => {
+        const frame = document.getElementById("artifact-frame") as HTMLIFrameElement;
+        const host = frame.contentDocument!.getElementById("shadow-host")!;
+        const span = host.shadowRoot!.querySelector("#shadow-inner-id")!;
+        return (window as any).__generateSelector(span);
+      });
+
+      // the bug this guards against: el.id short-circuiting BEFORE the
+      // shadow-root check would have returned shadowHost: null here, making
+      // this element unresolvable via plain document.querySelector
+      expect(result.selector).toBe("#shadow-inner-id");
+      expect(result.shadowHost).not.toBeNull();
+
+      const resolved = await page.evaluate(
+        (args) => {
+          const frame = document.getElementById("artifact-frame") as HTMLIFrameElement;
+          const doc = frame.contentDocument!;
+          const host = doc.querySelector(args.shadowHost) as Element & { shadowRoot: ShadowRoot };
+          const matches = host.shadowRoot.querySelectorAll(args.selector);
+          return { count: matches.length, text: matches[0]?.textContent };
+        },
+        { shadowHost: result.shadowHost, selector: result.selector },
+      );
+      expect(resolved.count).toBe(1);
+      expect(resolved.text).toBe("b");
+    } finally {
+      await cleanup(dir, handle);
+    }
+  });
 });

@@ -68,9 +68,11 @@ export function renderClientScript(): string {
   }
 
   function generateSelector(el) {
-    if (el.id) {
-      return { selector: "#" + cssEscape(el.id), shadowHost: null };
-    }
+    // Note: an id-bearing element does NOT short-circuit here — buildPathWithinRoot
+    // already returns "#id" as its first candidate, but only checking el.id up
+    // front (before the shadow-root check below) would wrongly report
+    // shadowHost: null for an id-bearing element that's actually inside a
+    // shadow root, making it unresolvable via plain document.querySelector.
     var rootNode = el.getRootNode();
     // duck-typed, not "instanceof ShadowRoot": rootNode may come from the
     // iframe's own realm, whose ShadowRoot constructor differs from this
