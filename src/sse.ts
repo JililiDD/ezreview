@@ -25,4 +25,16 @@ export class SseHub {
       }
     }
   }
+
+  // server.close() waits for existing keep-alive connections to end on their own; without this, it hangs forever while any SSE tab is open.
+  closeAll(): void {
+    for (const client of this.clients) {
+      try {
+        client.end();
+      } catch {
+        // already gone; nothing to clean up
+      }
+    }
+    this.clients.clear();
+  }
 }

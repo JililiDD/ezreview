@@ -65,6 +65,35 @@ describe("SseHub", () => {
     assert.equal(hub.size, 1);
   });
 
+  test("closeAll ends every connection and empties the registry", () => {
+    const hub = new SseHub();
+    let endCalledA = false;
+    let endCalledB = false;
+    const a = { end: () => { endCalledA = true; } } as unknown as ServerResponse;
+    const b = { end: () => { endCalledB = true; } } as unknown as ServerResponse;
+    hub.register(a);
+    hub.register(b);
+
+    hub.closeAll();
+
+    assert.equal(endCalledA, true);
+    assert.equal(endCalledB, true);
+    assert.equal(hub.size, 0);
+  });
+
+  test("closeAll tolerates a client whose end() throws", () => {
+    const hub = new SseHub();
+    const broken = {
+      end: () => {
+        throw new Error("already destroyed");
+      },
+    } as unknown as ServerResponse;
+    hub.register(broken);
+
+    assert.doesNotThrow(() => hub.closeAll());
+    assert.equal(hub.size, 0);
+  });
+
   test("broadcast does not write to an unregistered client", () => {
     const hub = new SseHub();
     const { res, writes } = fakeResponse();

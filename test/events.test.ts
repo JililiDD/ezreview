@@ -86,3 +86,33 @@ describe("/events SSE endpoint", () => {
     await new Promise((r) => setTimeout(r, 50));
   });
 });
+
+describe("close() with a live, non-aborted SSE client", () => {
+  test("resolves promptly instead of hanging on the open keep-alive connection", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-events-close-test-"));
+    const artifactPath = join(dir, "demo.html");
+    writeFileSync(artifactPath, "<html></html>");
+    const handle = await startReviewServer({ artifactPath, basePort: 4910 });
+
+    try {
+      // deliberately no AbortController — the client never disconnects on its own
+      const res = await fetch(new URL("/events", handle.url).toString(), {
+        headers: { Accept: "text/event-stream" },
+      });
+      const reader = res.body!.getReader();
+      await reader.read(); // consume ":ok" so the connection is fully established
+      assert.equal(handle.sseHub.size, 1);
+
+      const closed = handle.close();
+      const timedOut = Symbol("timeout");
+      const result = await Promise.race([
+        closed.then(() => "closed"),
+        new Promise((resolve) => setTimeout(() => resolve(timedOut), 2000)),
+      ]);
+
+      assert.notEqual(result, timedOut, "handle.close() hung with a live SSE client connected");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

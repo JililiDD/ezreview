@@ -150,6 +150,7 @@ export async function startReviewServer(options: ReviewServerOptions): Promise<R
     sseHub,
     close(): Promise<void> {
       watcherHandle.close();
+      sseHub.closeAll();
       return new Promise((resolvePromise, reject) => {
         server.close((err) => (err ? reject(err) : resolvePromise()));
       });

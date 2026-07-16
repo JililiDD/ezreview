@@ -13,6 +13,7 @@ export function renderShellPage(): string {
     --accent: #4f8ef7;
     --stage-bg: #f6f7f9;
     --ok-green: #3ecf7a;
+    --disconnect-red: #e05a4f;
   }
   html, body {
     margin: 0;
@@ -50,8 +51,15 @@ export function renderShellPage(): string {
     background: var(--ok-green);
     display: inline-block;
   }
+  #status-dot.disconnected {
+    background: var(--disconnect-red);
+  }
   #file-name {
     color: var(--chrome-fg);
+  }
+  #status-text {
+    color: var(--disconnect-red);
+    margin-left: 4px;
   }
   #spacer {
     flex: 1;
@@ -113,6 +121,7 @@ export function renderShellPage(): string {
     <div id="file-status">
       <span id="status-dot"></span>
       <span id="file-name">artifact</span>
+      <span id="status-text"></span>
     </div>
     <div id="spacer"></div>
     <div id="review-toggle">
@@ -124,6 +133,30 @@ export function renderShellPage(): string {
   <div id="stage">
     <iframe id="artifact-frame" src="/artifact"></iframe>
   </div>
+  <script>
+    (function () {
+      var dot = document.getElementById("status-dot");
+      var statusText = document.getElementById("status-text");
+      var frame = document.getElementById("artifact-frame");
+
+      function setConnected() {
+        dot.classList.remove("disconnected");
+        statusText.textContent = "";
+      }
+
+      function setDisconnected() {
+        dot.classList.add("disconnected");
+        statusText.textContent = "Disconnected · retrying…";
+      }
+
+      var source = new EventSource("/events");
+      source.onopen = setConnected;
+      source.onerror = setDisconnected;
+      source.addEventListener("reload", function () {
+        frame.src = "/artifact?t=" + Date.now();
+      });
+    })();
+  </script>
 </body>
 </html>
 `;
