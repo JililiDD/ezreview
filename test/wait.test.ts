@@ -123,6 +123,83 @@ describe("waitForFeedback", () => {
     }
   });
 
+  test("survives several seconds of complete silence before feedback arrives (regression: fetch()'s ~5min bodyTimeout misfiring on an intentionally idle long-poll)", async () => {
+    const ctx = await setUp(5730);
+    try {
+      const waitPromise = waitForFeedback(ctx.artifactPath, { sessionRoot: ctx.sessionRoot });
+
+      // Not a real 5-minute wait (unrealistic and flaky for a test suite) —
+      // this delay is only meant to prove the connection has no short
+      // implicit timeout of its own, structurally distinct from "arrives
+      // almost instantly" which the other tests already cover.
+      setTimeout(() => {
+        void fetch(new URL("/feedback", ctx.handle.url), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify([{ id: "a-3", comment: "took a while to write this" }]),
+        });
+      }, 2500);
+
+      const rendered = await waitPromise;
+      assert.match(rendered, /\[a-3\]/);
+      assert.match(rendered, /took a while to write this/);
+    } finally {
+      await tearDown(ctx);
+    }
+  });
+
+  test("throws WaitError if the server closes the connection while wait is still pending", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-wait-close-test-"));
+    const sessionRoot = mkdtempSync(join(tmpdir(), "ai-review-board-wait-close-session-test-"));
+    const artifactPath = join(dir, "demo.html");
+    writeFileSync(artifactPath, "<html></html>");
+    const sessionDir = sessionDirFor(artifactPath, sessionRoot);
+    const handle = await startReviewServer({ artifactPath, basePort: 5725, sessionDir });
+    writeSessionInfo(sessionDir, { port: handle.port, pid: process.pid, file: artifactPath });
+
+    try {
+      const waitPromise = waitForFeedback(artifactPath, { sessionRoot });
+      setTimeout(() => {
+        void handle.close();
+      }, 200);
+
+      await assert.rejects(() => waitPromise, WaitError);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(sessionRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("throws WaitError (not a raw low-level error) if the connection is destroyed abruptly, not gracefully closed", async () => {
+    // Regression: an abrupt socket reset rejects the underlying read()
+    // instead of resolving with done: true — must still surface as the
+    // same friendly WaitError, not an uncaught raw Node error (e.g.
+    // "aborted"/ECONNRESET), which is exactly the class of bug this
+    // work-item's fetch()-to-node:http switch exists to fix.
+    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-wait-abrupt-close-test-"));
+    const sessionRoot = mkdtempSync(join(tmpdir(), "ai-review-board-wait-abrupt-close-session-test-"));
+    const artifactPath = join(dir, "demo.html");
+    writeFileSync(artifactPath, "<html></html>");
+    const sessionDir = sessionDirFor(artifactPath, sessionRoot);
+    const handle = await startReviewServer({ artifactPath, basePort: 5726, sessionDir });
+    writeSessionInfo(sessionDir, { port: handle.port, pid: process.pid, file: artifactPath });
+
+    try {
+      const waitPromise = waitForFeedback(artifactPath, { sessionRoot });
+      setTimeout(() => {
+        // Forcibly destroys sockets at the transport level — distinct from
+        // handle.close()'s graceful sseHub.closeAll() (client.end()) path.
+        handle.server.closeAllConnections();
+      }, 200);
+
+      await assert.rejects(() => waitPromise, WaitError);
+    } finally {
+      await handle.close().catch(() => {});
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(sessionRoot, { recursive: true, force: true });
+    }
+  });
+
   test("two batches submitted before two waits are each consumed exactly once (AC-8)", async () => {
     const ctx = await setUp(5720);
     try {

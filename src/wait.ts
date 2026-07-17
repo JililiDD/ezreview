@@ -1,4 +1,5 @@
 import { TextDecoder } from "node:util";
+import { request as httpRequest, type IncomingMessage, type ClientRequest } from "node:http";
 import { sessionDirFor, readSessionInfo } from "./session.js";
 import { checkHealthz, DEFAULT_HOST } from "./server.js";
 import { consumeNextBatch, loadThreadHistory } from "./feedback-queue.js";
@@ -47,11 +48,24 @@ export interface WaitOptions {
   sessionRoot?: string;
 }
 
-async function nextSseChunk(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  decoder: TextDecoder,
-  state: { buffer: string },
-): Promise<string> {
+// Byte-source abstraction so nextSseChunk's chunk-boundary parsing stays
+// unchanged regardless of what actually produced the bytes — only the
+// adapter below needs to know it's really a node:http IncomingMessage.
+interface ByteReader {
+  read(): Promise<{ value?: Uint8Array; done: boolean }>;
+}
+
+function readerFromIncomingMessage(res: IncomingMessage): ByteReader {
+  const iterator = res[Symbol.asyncIterator]();
+  return {
+    async read() {
+      const { value, done } = await iterator.next();
+      return { value: value as Uint8Array | undefined, done: !!done };
+    },
+  };
+}
+
+async function nextSseChunk(reader: ByteReader, decoder: TextDecoder, state: { buffer: string }): Promise<string> {
   while (true) {
     const boundary = state.buffer.indexOf("\n\n");
     if (boundary !== -1) {
@@ -59,12 +73,32 @@ async function nextSseChunk(
       state.buffer = state.buffer.slice(boundary + 2);
       return chunk;
     }
-    const { value, done } = await reader.read();
+    // A graceful close (server calls res.end()) resolves with done: true; an
+    // abrupt one (socket reset, forcibly destroyed connection) instead rejects
+    // this read — both must present the same friendly WaitError to the CLI,
+    // not a raw low-level error message (the exact failure mode this fix exists for).
+    let value: Uint8Array | undefined;
+    let done: boolean;
+    try {
+      ({ value, done } = await reader.read());
+    } catch {
+      throw new WaitError("Connection to the review server closed unexpectedly.");
+    }
     if (done) {
       throw new WaitError("Connection to the review server closed unexpectedly.");
     }
     state.buffer += decoder.decode(value, { stream: true });
   }
+}
+
+function connectToEvents(baseUrl: string): Promise<{ req: ClientRequest; res: IncomingMessage }> {
+  return new Promise((resolvePromise, reject) => {
+    const req = httpRequest(new URL("events", baseUrl), { headers: { Accept: "text/event-stream" } }, (res) => {
+      resolvePromise({ req, res });
+    });
+    req.on("error", reject);
+    req.end();
+  });
 }
 
 export async function waitForFeedback(file: string, opts: WaitOptions = {}): Promise<string> {
@@ -85,12 +119,14 @@ export async function waitForFeedback(file: string, opts: WaitOptions = {}): Pro
   // Subscribe before checking the file (not the reverse) so a batch that
   // lands in the narrow window between the check and the subscribe can
   // never be missed — the SSE connection is already open and buffering.
-  const controller = new AbortController();
-  const res = await fetch(new URL("events", baseUrl), {
-    headers: { Accept: "text/event-stream" },
-    signal: controller.signal,
-  });
-  const reader = res.body!.getReader();
+  //
+  // node:http, not the global fetch(): this connection is meant to sit
+  // quietly for as long as it takes a human to write feedback (minutes to
+  // tens of minutes), but fetch()'s underlying undici dispatcher enforces a
+  // ~5 minute idle body timeout on every request — including ones designed
+  // to stay open with no data in between. node:http has no such default.
+  const { req, res } = await connectToEvents(baseUrl);
+  const reader = readerFromIncomingMessage(res);
   const decoder = new TextDecoder();
   const state = { buffer: "" };
 
@@ -108,6 +144,6 @@ export async function waitForFeedback(file: string, opts: WaitOptions = {}): Pro
       }
     }
   } finally {
-    controller.abort();
+    req.destroy();
   }
 }
