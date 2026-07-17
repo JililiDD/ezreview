@@ -2,62 +2,138 @@ import { renderClientScript } from "./shell-client.js";
 
 export function renderShellPage(): string {
   return `<!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8" />
 <title>ai-review-board</title>
 <style>
-  :root {
-    --chrome-bg: #17181c;
-    --chrome-border: #2a2c33;
-    --chrome-fg: #b8bcc4;
-    --chrome-dim: #6f7480;
-    --accent: #4f8ef7;
-    --accent-soft: rgba(79, 142, 247, 0.12);
-    --stage-bg: #f6f7f9;
-    --ok-green: #3ecf7a;
-    --disconnect-red: #e05a4f;
-    --stale-amber-fg: #9a6b1f;
-    --stale-amber-bg: #faf0dc;
+  :root[data-theme="dark"] {
+    --chrome-bg: rgba(18, 24, 38, 0.72);
+    --chrome-bg-solid: #0f1420;
+    --chrome-border: rgba(120, 200, 255, 0.25);
+    --chrome-fg: #dce8f5;
+    --chrome-dim: #6f8299;
+    --accent: #4ee6c4;
+    --accent-soft: rgba(78, 230, 196, 0.15);
+    --accent-ink: #06231c;
+    --stage-bg: #06080d;
+    --stage-glow: radial-gradient(circle at 50% 0%, #0c1220, var(--stage-bg) 70%);
+    --bg-glow-1: rgba(78, 230, 196, 0.06);
+    --bg-glow-2: rgba(157, 123, 255, 0.08);
+    --ok-green: #4ee6c4;
+    --disconnect-red: #ff7a90;
+    --stale-amber-fg: #e0c578;
+    --stale-amber-bg: rgba(224, 197, 120, 0.12);
+    --agent-fg: #f0e3bd;
+    --agent-soft: rgba(224, 197, 120, 0.09);
+    --agent-border: rgba(224, 197, 120, 0.3);
+    --agent-label: #e0c578;
+    --title-fg: #fff;
+    --body-fg: #c3d0e0;
+    --card-bg: #0f1420;
+    --card-sent-bg: #141b2b;
+    --card-border: rgba(120, 200, 255, 0.18);
+    --card-fg: #dce8f5;
+    --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02), 0 8px 20px -8px rgba(0, 0, 0, 0.6);
+    --draft-input-bg: rgba(255, 255, 255, 0.03);
+    --danger-soft: rgba(255, 122, 144, 0.1);
+    --modal-bg: #0f1420;
+    --modal-fg: #dce8f5;
+    --modal-cancel-bg: rgba(120, 200, 255, 0.12);
+    --modal-cancel-fg: #dce8f5;
+  }
+  :root[data-theme="light"] {
+    --chrome-bg: rgba(255, 255, 255, 0.78);
+    --chrome-bg-solid: #ffffff;
+    --chrome-border: rgba(20, 90, 110, 0.18);
+    --chrome-fg: #1c2b33;
+    --chrome-dim: #64798a;
+    --accent: #0f9e82;
+    --accent-soft: rgba(15, 158, 130, 0.12);
+    --accent-ink: #ffffff;
+    --stage-bg: #eef2f6;
+    --stage-glow: radial-gradient(circle at 50% 0%, #ffffff, var(--stage-bg) 70%);
+    --bg-glow-1: rgba(15, 158, 130, 0.07);
+    --bg-glow-2: rgba(120, 110, 230, 0.06);
+    --ok-green: #0f9e82;
+    --disconnect-red: #c23b52;
+    --stale-amber-fg: #6b5312;
+    --stale-amber-bg: rgba(168, 120, 31, 0.12);
+    --agent-fg: #6b5312;
+    --agent-soft: rgba(168, 120, 31, 0.1);
+    --agent-border: rgba(168, 120, 31, 0.3);
+    --agent-label: #a8781f;
+    --title-fg: #10202a;
+    --body-fg: #35454e;
+    --card-bg: #ffffff;
+    --card-sent-bg: #f2f5f7;
+    --card-border: rgba(20, 90, 110, 0.14);
+    --card-fg: #1c2b33;
+    --card-shadow: 0 0 0 1px rgba(0, 0, 0, 0.02), 0 8px 20px -8px rgba(20, 40, 50, 0.12);
+    --draft-input-bg: rgba(0, 0, 0, 0.02);
+    --danger-soft: rgba(194, 59, 82, 0.08);
+    --modal-bg: #ffffff;
+    --modal-fg: #1c2b33;
+    --modal-cancel-bg: rgba(20, 90, 110, 0.08);
+    --modal-cancel-fg: #1c2b33;
   }
   html, body {
     margin: 0;
     padding: 0;
     height: 100%;
-    font-family: system-ui, "Segoe UI", sans-serif;
-    font-size: 12.5px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 13px;
   }
   body {
     display: flex;
     flex-direction: column;
+    background: var(--stage-bg);
+    color: var(--chrome-fg);
+    background-image:
+      radial-gradient(circle at 15% 15%, var(--bg-glow-1), transparent 40%),
+      radial-gradient(circle at 85% 80%, var(--bg-glow-2), transparent 45%);
   }
   #toolbar {
-    height: 40px;
-    flex: 0 0 40px;
+    height: 48px;
+    flex: 0 0 48px;
     background: var(--chrome-bg);
+    backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--chrome-border);
     color: var(--chrome-fg);
     display: flex;
     align-items: center;
-    padding: 0 12px;
+    padding: 0 18px;
     gap: 16px;
     box-sizing: border-box;
+    position: relative;
+  }
+  #wordmark {
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--chrome-dim);
+    border-right: 1px solid var(--chrome-border);
+    padding-right: 14px;
   }
   #file-status {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-family: ui-monospace, Consolas, monospace;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 13px;
   }
   #status-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     background: var(--ok-green);
+    box-shadow: 0 0 8px var(--ok-green), 0 0 2px var(--ok-green);
     display: inline-block;
   }
   #status-dot.disconnected {
     background: var(--disconnect-red);
+    box-shadow: 0 0 8px var(--disconnect-red), 0 0 2px var(--disconnect-red);
   }
   #file-name {
     color: var(--chrome-fg);
@@ -65,6 +141,7 @@ export function renderShellPage(): string {
   #status-text {
     color: var(--disconnect-red);
     margin-left: 4px;
+    font-weight: 400;
   }
   #spacer {
     flex: 1;
@@ -74,34 +151,44 @@ export function renderShellPage(): string {
     align-items: center;
     gap: 8px;
     color: var(--chrome-dim);
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
   .switch {
-    width: 32px;
+    width: 34px;
     height: 18px;
     border-radius: 9px;
-    background: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
     position: relative;
     cursor: pointer;
   }
   .switch[data-on="false"] {
-    background: var(--chrome-border);
+    background: transparent;
+    border-color: var(--chrome-border);
   }
   .switch-knob {
     position: absolute;
-    top: 2px;
-    left: 16px;
+    top: 1px;
+    left: 17px;
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
     transition: left 0.15s ease;
   }
   .switch[data-on="false"] .switch-knob {
-    left: 2px;
+    left: 1px;
+    background: var(--chrome-dim);
+    box-shadow: none;
   }
   #scroll-hint {
     color: var(--chrome-dim);
-    font-size: 11.5px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12.5px;
     /* visibility, not display: the review toggle's own position must never
        shift when this shows/hides — its box stays reserved either way. */
     visibility: hidden;
@@ -112,27 +199,51 @@ export function renderShellPage(): string {
   #spacer-2 {
     flex: 1;
   }
-  #confirm-document {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 12.5px;
+  #theme-toggle {
+    background: transparent;
+    border: 1px solid var(--chrome-border);
+    color: var(--chrome-dim);
+    border-radius: 4px;
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #theme-toggle:hover {
+    color: var(--chrome-fg);
+    border-color: var(--accent);
+  }
+  #confirm-document {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+  }
+  #confirm-document:hover {
+    background: var(--accent-soft);
   }
   #confirm-document:disabled {
-    background: var(--chrome-border);
+    background: transparent;
     color: var(--chrome-dim);
+    border-color: var(--chrome-border);
     cursor: default;
   }
   #send-all {
     background: var(--accent);
-    color: #fff;
+    color: var(--accent-ink);
     border: none;
     border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 12.5px;
+    padding: 9px 12px;
+    font-weight: 700;
+    font-size: 15px;
     cursor: pointer;
   }
   #send-all:disabled {
@@ -144,18 +255,27 @@ export function renderShellPage(): string {
     flex: 1;
     display: flex;
     min-height: 0;
+    position: relative;
   }
   #artifact-pane {
     flex: 1;
     min-width: 0;
-    background: var(--stage-bg);
+    background: var(--stage-glow);
     position: relative;
+    padding-left: 16px;
+    box-sizing: border-box;
   }
   #artifact-frame {
     width: 100%;
     height: 100%;
     border: none;
     display: block;
+    /* The artifact document is arbitrary, uncontrolled HTML — many pages
+       have no explicit background at all, which defaults to transparent,
+       not white. Force the iframe element itself opaque so the pane's own
+       (now dark-mode-aware) background never shows through unstyled
+       artifact content, regardless of what that content does or doesn't set. */
+    background: #fff;
   }
   #rail-grip {
     width: 6px;
@@ -166,7 +286,8 @@ export function renderShellPage(): string {
   #comment-rail {
     flex: 0 0 auto;
     width: 280px;
-    background: #fff;
+    background: var(--chrome-bg);
+    backdrop-filter: blur(12px);
     border-left: 1px solid var(--chrome-border);
     position: relative;
     overflow: hidden;
@@ -192,8 +313,8 @@ export function renderShellPage(): string {
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    background: var(--chrome-bg);
-    color: #fff;
+    background: var(--chrome-bg-solid);
+    color: var(--chrome-fg);
     border: 1px solid var(--chrome-border);
     font-size: 11px;
     line-height: 1;
@@ -207,8 +328,8 @@ export function renderShellPage(): string {
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    background: var(--chrome-bg);
-    color: #fff;
+    background: var(--chrome-bg-solid);
+    color: var(--chrome-fg);
     border: 1px solid var(--chrome-border);
     font-size: 12px;
     line-height: 1;
@@ -220,11 +341,11 @@ export function renderShellPage(): string {
     left: 0;
     right: 0;
     bottom: 0;
-    height: 48px;
+    height: 56px;
     box-sizing: border-box;
-    padding: 8px 12px;
-    background: #fff;
-    border-top: 1px solid #e3e5e9;
+    padding: 8px 14px;
+    background: var(--chrome-bg-solid);
+    border-top: 1px solid var(--chrome-border);
     display: flex;
     align-items: center;
   }
@@ -267,17 +388,18 @@ export function renderShellPage(): string {
     display: flex;
   }
   #confirm-modal {
-    background: #fff;
+    background: var(--modal-bg);
+    border: 1px solid var(--chrome-border);
     border-radius: 10px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
     padding: 20px 22px;
     width: 320px;
-    font-family: system-ui, "Segoe UI", sans-serif;
-    color: #1c1e22;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    color: var(--modal-fg);
   }
   #confirm-modal p {
     margin: 0 0 18px;
-    font-size: 13px;
+    font-size: 13.5px;
     line-height: 1.5;
   }
   #confirm-modal-actions {
@@ -289,21 +411,22 @@ export function renderShellPage(): string {
     border: none;
     border-radius: 6px;
     padding: 6px 14px;
-    font-size: 12.5px;
+    font-size: 13px;
     cursor: pointer;
   }
   #confirm-modal-cancel {
-    background: #eef0f3;
-    color: #33363c;
+    background: var(--modal-cancel-bg);
+    color: var(--modal-cancel-fg);
   }
   #confirm-modal-ok {
     background: var(--accent);
-    color: #fff;
+    color: var(--accent-ink);
   }
 </style>
 </head>
 <body>
   <div id="toolbar">
+    <span id="wordmark">ai-review-board</span>
     <div id="file-status">
       <span id="status-dot"></span>
       <span id="file-name">Agent connected</span>
@@ -316,6 +439,7 @@ export function renderShellPage(): string {
     </div>
     <span id="scroll-hint">Scroll while hovering to widen the selection</span>
     <div id="spacer-2"></div>
+    <button id="theme-toggle" title="Toggle light/dark theme">☀︎</button>
     <button id="confirm-document">Confirm document</button>
   </div>
   <div id="stage">

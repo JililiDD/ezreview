@@ -25,8 +25,8 @@ test("shell page shows the dark toolbar and loads the artifact in the iframe", a
 
   const toolbar = page.locator("#toolbar");
   await expect(toolbar).toBeVisible();
-  await expect(toolbar).toHaveCSS("height", "40px");
-  await expect(toolbar).toHaveCSS("background-color", "rgb(23, 24, 28)");
+  await expect(toolbar).toHaveCSS("height", "48px");
+  await expect(toolbar).toHaveCSS("background-color", "rgba(18, 24, 38, 0.72)");
 
   const reviewSwitch = page.locator("#review-switch");
   await expect(reviewSwitch).toHaveAttribute("data-on", "true");

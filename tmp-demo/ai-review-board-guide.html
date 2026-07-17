@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ai-review-board — agent usage guide</title>
+</head>
+<body>
+  <h1>ai-review-board — agent usage guide</h1>
+  <p><code>ai-review-board</code> closes the loop between an agent that writes HTML artifacts and a human who
+  reviews them in a browser. The human annotates the rendered artifact directly (clicking elements, selecting
+  text); the agent reads those 测试这里 back as structured, Edit-ready text and either edits the file or
+  answers a question.</p>
+
+  <p>This document assumes no prior knowledge of the tool beyond what's written here.</p>
+
+  <h2>The three commands</h2>
+
+  <h3><code>ai-review-board &lt;file.html&gt;</code> (no subcommand) — open a review session</h3>
+  <pre>ai-review-board report.html</pre>
+  <ul>
+    <li><strong>It is a foreground process.</strong> It does not return until you kill it (Ctrl+C) or the
+      server auto-exits after 1 hour with no client connected.</li>
+    <li><strong>It is idempotent — call it as many times as you want.</strong> If a server for this exact file
+      is already running, running <code>open</code> again just prints the existing URL and exits immediately.</li>
+    <li>It binds to <code>127.0.0.1</code> only (no LAN/remote access).</li>
+    <li>If <code>&lt;file.html&gt;</code> doesn't exist, all three commands fail the same way: an
+      <code>Error: File not found: &lt;path&gt;</code> message on stderr and a non-zero exit.</li>
+  </ul>
+
+  <h3><code>ai-review-board wait &lt;file.html&gt;</code> — block until the next batch of feedback</h3>
+  <pre>ai-review-board wait report.html</pre>
+  <ul>
+    <li>Blocks until the reviewer clicks "Send all" in the browser, then prints one batch of annotations as
+      structured, readable text to stdout and exits 0.</li>
+    <li><strong>If a batch was already sent before you called <code>wait</code>, you still get it
+      immediately</strong> — nothing is lost by calling <code>wait</code> late.</li>
+    <li>Each annotation has a stable id (e.g. <code>a-3</code>), an element <code>selector</code> and
+      (truncated) <code>outerHTML</code>, or <code>selectedText</code>/surrounding <code>context</code>, and
+      the reviewer's <code>comment</code>.</li>
+  </ul>
+
+  <h3><code>ai-review-board reply &lt;file.html&gt; --to &lt;id&gt; "&lt;answer text&gt;"</code> — answer a question</h3>
+  <pre>ai-review-board reply report.html --to a-3 "It's the API's required timezone format, not a bug."</pre>
+  <ul>
+    <li>Use this for annotations that are <strong>questions</strong>, not change requests.</li>
+    <li><strong>Always quote the answer text</strong> as a single shell argument.</li>
+    <li><strong>One answer per annotation, ever.</strong> A second reply to the same id is rejected.</li>
+  </ul>
+
+  <h2>Deciding: edit the file, or reply?</h2>
+  <table border="1" cellpadding="6">
+    <tr><th>Signal</th><th>Action</th></tr>
+    <tr><td>"Make this bigger", "fix the typo", "this color is wrong"</td><td style="background-color: #ffe0e0;">Edit the file</td></tr>
+    <tr><td>"Why is this here?", "what does this mean?"</td><td><code>reply --to &lt;id&gt;</code></td></tr>
+    <tr><td>"Why is this button so tiny?" (question-shaped, but really a fix request)</td><td>Treat as a change request</td></tr>
+  </table>
+
+  <h2>Writing artifacts so annotations stay useful</h2>
+  <ul>
+    <li>Never collapse the file to one line.</li>
+    <li>Separate data from markup — use a <code>&lt;script type="application/json"&gt;</code> block for structured data.</li>
+    <li>Don't inline large binary assets as base64.</li>
+    <li>Prefer a precise Edit over rewriting the whole file.</li>
+  </ul>
+</body>
+</html>

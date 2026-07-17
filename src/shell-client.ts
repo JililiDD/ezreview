@@ -17,8 +17,41 @@ export function renderClientScript(): string {
   var confirmModalOk = document.getElementById("confirm-modal-ok");
   var confirmModalCancel = document.getElementById("confirm-modal-cancel");
   var fileNameLabel = document.getElementById("file-name");
+  var themeToggleButton = document.getElementById("theme-toggle");
   var documentReadOnly = false;
   var documentConfirmed = false;
+
+  // ---- Theme toggle (light/dark) ----
+
+  var THEME_STORAGE_KEY = "ai-review-board-theme";
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    themeToggleButton.textContent = theme === "dark" ? "☀︎" : "☾";
+  }
+
+  (function initTheme() {
+    var stored = null;
+    try {
+      stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    } catch (e) {
+      // localStorage may be unavailable (privacy mode, sandboxed iframe) —
+      // fall back to the server-rendered default theme silently.
+    }
+    if (stored === "light" || stored === "dark") applyTheme(stored);
+  })();
+
+  themeToggleButton.addEventListener("click", function () {
+    var isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    var next = isDark ? "light" : "dark";
+    applyTheme(next);
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, next);
+    } catch (e) {
+      // Best-effort persistence only — a failed write just means the choice
+      // won't survive a reload, which is no worse than not persisting at all.
+    }
+  });
 
   function setConnected() {
     dot.classList.remove("disconnected");
@@ -497,7 +530,7 @@ export function renderClientScript(): string {
     answerBlock.style.marginTop = "6px";
     answerBlock.style.paddingLeft = "8px";
     answerBlock.style.borderLeft = "3px solid var(--accent)";
-    answerBlock.style.background = "#f4f8fe";
+    answerBlock.style.background = "var(--accent-soft)";
 
     var agentLabel = document.createElement("div");
     agentLabel.className = "agent-label";
@@ -531,7 +564,7 @@ export function renderClientScript(): string {
     meBlock.className = "me-block";
     meBlock.style.paddingLeft = "8px";
     meBlock.style.borderLeft = "3px solid var(--disconnect-red)";
-    meBlock.style.background = "#fef4f3";
+    meBlock.style.background = "var(--danger-soft)";
 
     var meLabel = document.createElement("div");
     meLabel.className = "me-label";
@@ -587,11 +620,12 @@ export function renderClientScript(): string {
   function createBubbleShell() {
     var node = document.createElement("div");
     node.className = "bubble";
-    node.style.background = "#fff";
-    node.style.border = "1px solid #e3e5e9";
+    node.style.background = "var(--card-bg)";
+    node.style.color = "var(--card-fg)";
+    node.style.border = "1px solid var(--card-border)";
     node.style.borderRadius = "8px";
     node.style.padding = "10px 12px";
-    node.style.boxShadow = "0 1px 4px rgba(20,24,33,.08)";
+    node.style.boxShadow = "var(--card-shadow)";
     node.style.fontSize = "13px";
     node.style.boxSizing = "border-box";
     node.style.marginBottom = "8px";
@@ -632,12 +666,14 @@ export function renderClientScript(): string {
     textarea.style.width = "100%";
     textarea.style.boxSizing = "border-box";
     textarea.style.marginTop = "16px";
-    textarea.style.border = "1px solid #e3e5e9";
+    textarea.style.border = "1px solid var(--card-border)";
     textarea.style.borderRadius = "6px";
     textarea.style.padding = "6px 8px";
     textarea.style.fontSize = "13px";
     textarea.style.fontFamily = "inherit";
     textarea.style.resize = "vertical";
+    textarea.style.background = "var(--draft-input-bg)";
+    textarea.style.color = "var(--card-fg)";
     textarea.rows = 3;
 
     var footer = document.createElement("div");
@@ -1212,7 +1248,7 @@ export function renderClientScript(): string {
     var deleteBtn = node.querySelector(".bubble-delete");
     if (deleteBtn) deleteBtn.remove();
     node.classList.add("bubble-sent");
-    node.style.background = "#f2f2f2";
+    node.style.background = "var(--card-sent-bg)";
     addFollowUpControls(node, node.getAttribute("data-annotation-id"));
 
     var collapseBtn = document.createElement("button");
