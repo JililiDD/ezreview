@@ -1,6 +1,6 @@
 import type { SseHub } from "./sse.js";
 
-export const DEFAULT_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+export const DEFAULT_IDLE_TIMEOUT_MS = 60 * 60 * 1000;
 
 export interface IdleWatcherHandle {
   stop(): void;

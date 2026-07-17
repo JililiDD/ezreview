@@ -45,7 +45,7 @@ Edit the artifact file directly for change-request annotations — the browser r
 
 Starts a local server, opens the artifact in the reviewer's browser, and prints the URL to stdout.
 
-- Foreground process: it doesn't return until you kill it (Ctrl+C), or the server auto-exits after 10 minutes idle (no browser tab and no blocked `wait` call).
+- Foreground process: it doesn't return until you kill it (Ctrl+C), or the server auto-exits after 1 hour idle (no browser tab and no blocked `wait` call).
 - Idempotent: calling it again for the same file just prints the existing URL and exits 0 — never starts a second server.
 - Binds to `127.0.0.1` only.
 

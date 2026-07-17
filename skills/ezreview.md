@@ -14,7 +14,7 @@ Starts a local server, opens the artifact in the reviewer's browser, and prints 
 ezreview report.html
 ```
 
-- **It is a foreground process.** It does not return until you kill it (Ctrl+C) or the server auto-exits after 10 minutes with no client connected (neither a browser tab nor a blocked `wait` call). Because of this, launch it with your host's background-task mechanism (the same way you'd launch any long-running dev server) rather than waiting on it synchronously.
+- **It is a foreground process.** It does not return until you kill it (Ctrl+C) or the server auto-exits after 1 hour with no client connected (neither a browser tab nor a blocked `wait` call). Because of this, launch it with your host's background-task mechanism (the same way you'd launch any long-running dev server) rather than waiting on it synchronously.
 - **It is idempotent — call it as many times as you want.** If a server for this exact file is already running, running `open` again just prints the existing URL and exits immediately (exit 0); it never starts a second instance. There is no need to check "is a server already running for this file" before calling it — just call it.
 - It binds to `127.0.0.1` only (no LAN/remote access).
 - If `<file.html>` doesn't exist, all three commands (`open`, `wait`, `reply`) fail the same way: an `Error: File not found: <path>` message on stderr and a non-zero exit — check the path if you see this.

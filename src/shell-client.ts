@@ -53,7 +53,14 @@ export function renderClientScript(): string {
     }
   });
 
+  var STALE_DISCONNECT_MS = 15000;
+  var staleDisconnectTimer = null;
+
   function setConnected() {
+    if (staleDisconnectTimer) {
+      window.clearTimeout(staleDisconnectTimer);
+      staleDisconnectTimer = null;
+    }
     dot.classList.remove("disconnected");
     statusText.textContent = "";
     agentStatusLabel.textContent = "Agent connected";
@@ -64,9 +71,22 @@ export function renderClientScript(): string {
     if (documentConfirmed) {
       agentStatusLabel.textContent = "Agent disconnected";
       statusText.textContent = "";
-    } else {
-      agentStatusLabel.textContent = "Agent connected";
-      statusText.textContent = "Disconnected · retrying…";
+      return;
+    }
+    agentStatusLabel.textContent = "Agent connected";
+    statusText.textContent = "Disconnected · retrying…";
+    // The browser's own EventSource keeps retrying on its own — this is just
+    // upgrading the message once a retry storm has gone on long enough that
+    // it's more likely the server process itself exited (e.g. idle auto-exit)
+    // than a transient network blip, since a manual "reconnect" button
+    // couldn't do anything a still-alive server's own retry wouldn't already.
+    if (!staleDisconnectTimer) {
+      staleDisconnectTimer = window.setTimeout(function () {
+        staleDisconnectTimer = null;
+        if (dot.classList.contains("disconnected") && !documentConfirmed) {
+          statusText.textContent = "Server may have stopped — ask the agent to reopen";
+        }
+      }, STALE_DISCONNECT_MS);
     }
   }
 
