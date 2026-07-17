@@ -10,6 +10,7 @@ export function renderClientScript(): string {
   var railScroll = document.getElementById("rail-scroll");
   var railGrip = document.getElementById("rail-grip");
   var railCollapseBtn = document.getElementById("rail-collapse");
+  var railCollapseAllBtn = document.getElementById("rail-collapse-all");
   var railFooter = document.getElementById("rail-footer");
   var confirmDocumentButton = document.getElementById("confirm-document");
 
@@ -315,11 +316,31 @@ export function renderClientScript(): string {
     railCollapseBtn.textContent = railCollapsed ? "›" : "‹";
     railScroll.style.display = railCollapsed ? "none" : "block";
     railFooter.style.display = railCollapsed ? "none" : "flex";
+    // The collapsed rail is too narrow (28px) to fit both this and
+    // #rail-collapse without overlapping, and there is nothing to collapse
+    // when every bubble is already hidden anyway.
+    railCollapseAllBtn.style.display = railCollapsed ? "none" : "block";
   }
 
   railCollapseBtn.addEventListener("click", function () {
     railCollapsed = !railCollapsed;
     applyRailWidth();
+  });
+
+  // Toggles based on current majority state — if any bubble is expanded,
+  // the next click collapses everything; only once all are already
+  // collapsed does it switch to expanding everything.
+  railCollapseAllBtn.addEventListener("click", function () {
+    var anyExpanded = false;
+    for (var i = 0; i < sentItems.length; i++) {
+      if (!sentItems[i].node.classList.contains("bubble-collapsed")) {
+        anyExpanded = true;
+        break;
+      }
+    }
+    for (var j = 0; j < sentItems.length; j++) {
+      setBubbleCollapsed(sentItems[j].node, anyExpanded);
+    }
   });
 
   var railResizing = false;
@@ -447,6 +468,7 @@ export function renderClientScript(): string {
           : existingReplyControls;
         node.appendChild(controlsRoot);
       }
+      if (node.classList.contains("bubble-collapsed")) container.style.display = "none";
     }
     return container;
   }
@@ -1072,6 +1094,7 @@ export function renderClientScript(): string {
     if (node.querySelector(".followup-controls") || node.querySelector(".followup-reply-btn")) return;
 
     var replyBtnRow = document.createElement("div");
+    replyBtnRow.className = "followup-reply-row";
     replyBtnRow.style.display = "flex";
     replyBtnRow.style.justifyContent = "flex-end";
     replyBtnRow.style.marginTop = "8px";
@@ -1088,6 +1111,7 @@ export function renderClientScript(): string {
     replyBtn.style.cursor = "pointer";
     replyBtnRow.appendChild(replyBtn);
     node.appendChild(replyBtnRow);
+    if (node.classList.contains("bubble-collapsed")) replyBtnRow.style.display = "none";
 
     replyBtn.addEventListener("click", function () {
       replyBtnRow.remove();
@@ -1121,7 +1145,11 @@ export function renderClientScript(): string {
       });
 
       node.appendChild(wrap);
-      controls.textarea.focus();
+      if (node.classList.contains("bubble-collapsed")) {
+        wrap.style.display = "none";
+      } else {
+        controls.textarea.focus();
+      }
     });
   }
 
@@ -1139,12 +1167,57 @@ export function renderClientScript(): string {
     updateSendAllLabel();
   }
 
+  // Collapsing a sent bubble hides everything except the original "ME"
+  // comment at the top — the thread history and the reply controls
+  // (whichever of the collapsed Reply button or the expanded textarea is
+  // currently showing). Direct style.display toggling, not a CSS class,
+  // matching this file's existing show/hide convention (e.g. applyRailWidth)
+  // — a class-based rule would be overridden by inline styles already set
+  // on these same elements (e.g. .followup-reply-row's own display: flex).
+  function setBubbleCollapsed(node, collapsed) {
+    // A class purely as a state flag (queried, not styled by CSS) — lets
+    // thread/reply-control elements created or recreated *while* collapsed
+    // (a new agent reply, cancelling out of an expanded follow-up form)
+    // start out hidden too, instead of only the elements alive at toggle time.
+    node.classList.toggle("bubble-collapsed", collapsed);
+    var thread = node.querySelector(".bubble-thread");
+    var replyRow = node.querySelector(".followup-reply-row");
+    var controls = node.querySelector(".followup-controls");
+    if (thread) thread.style.display = collapsed ? "none" : "block";
+    if (replyRow) replyRow.style.display = collapsed ? "none" : "flex";
+    if (controls) controls.style.display = collapsed ? "none" : "block";
+    var toggleBtn = node.querySelector(".bubble-collapse-toggle");
+    if (toggleBtn) toggleBtn.textContent = collapsed ? "+" : "−";
+  }
+
   function markBubbleSent(node) {
     var deleteBtn = node.querySelector(".bubble-delete");
     if (deleteBtn) deleteBtn.remove();
     node.classList.add("bubble-sent");
     node.style.background = "#f2f2f2";
     addFollowUpControls(node, node.getAttribute("data-annotation-id"));
+
+    var collapseBtn = document.createElement("button");
+    collapseBtn.className = "bubble-collapse-toggle";
+    collapseBtn.title = "Collapse this comment";
+    collapseBtn.textContent = "−";
+    collapseBtn.style.position = "absolute";
+    collapseBtn.style.top = "6px";
+    collapseBtn.style.right = "6px";
+    collapseBtn.style.width = "20px";
+    collapseBtn.style.height = "20px";
+    collapseBtn.style.lineHeight = "18px";
+    collapseBtn.style.border = "none";
+    collapseBtn.style.background = "transparent";
+    collapseBtn.style.color = "var(--chrome-dim)";
+    collapseBtn.style.fontSize = "16px";
+    collapseBtn.style.cursor = "pointer";
+    collapseBtn.style.borderRadius = "4px";
+    collapseBtn.style.padding = "0";
+    collapseBtn.addEventListener("click", function () {
+      setBubbleCollapsed(node, collapseBtn.textContent === "−");
+    });
+    node.appendChild(collapseBtn);
   }
 
   function showSendFailure(message) {

@@ -195,6 +195,21 @@ export function renderShellPage(): string {
     cursor: pointer;
     z-index: 950;
   }
+  #rail-collapse-all {
+    position: absolute;
+    top: 8px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--chrome-bg);
+    color: #fff;
+    border: 1px solid var(--chrome-border);
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 950;
+  }
   #rail-footer {
     position: absolute;
     left: 0;
@@ -259,6 +274,7 @@ export function renderShellPage(): string {
     <div id="rail-grip"></div>
     <div id="comment-rail">
       <button id="rail-collapse" title="Collapse comments">‹</button>
+      <button id="rail-collapse-all" title="Collapse/expand all comments">≡</button>
       <div id="rail-scroll"></div>
       <div id="rail-footer">
         <span id="reply-spinner" title="Waiting for the agent to reply"></span>
