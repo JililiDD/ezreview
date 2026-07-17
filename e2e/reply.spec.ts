@@ -50,13 +50,25 @@ test("an agent reply renders inside the same bubble with an AGENT label, and a f
     await expect(bubble.locator(".answer-block .agent-label")).toHaveText("AGENT");
     await expect(bubble.locator(".answer-block .answer-text")).toHaveText("because the API requires it");
 
+    // The original comment is styled like a message too — a "ME" label,
+    // matching the AGENT block's visual language.
+    await expect(bubble.locator(".me-block .me-label")).toHaveText("ME");
+    await expect(bubble.locator(".me-block .bubble-comment")).toHaveText("why is this here?");
+
     // DAC-3: no terminal "✓ Answered" badge — threads have no terminal state.
     await expect(bubble.locator(".answered-badge")).toHaveCount(0);
 
     // The follow-up input is collapsed behind a "Reply" button by default;
-    // clicking it reveals the textarea/Add controls.
-    await expect(bubble.locator(".followup-reply-btn")).toBeVisible();
-    await bubble.locator(".followup-reply-btn").click();
+    // clicking it reveals the textarea/Add controls. It must sit at the
+    // bubble's bottom-right — after the agent's reply, not sandwiched
+    // between the original comment and the reply.
+    const replyBtn = bubble.locator(".followup-reply-btn");
+    await expect(replyBtn).toBeVisible();
+    const threadBox = await bubble.locator(".bubble-thread").boundingBox();
+    const replyBtnBox = await replyBtn.boundingBox();
+    expect(replyBtnBox!.y).toBeGreaterThan(threadBox!.y + threadBox!.height - 1);
+
+    await replyBtn.click();
     await expect(bubble.locator(".followup-controls textarea")).toBeVisible();
 
     // a second reply to the same id still succeeds (no answered-once cap).
@@ -87,6 +99,7 @@ test("submitting a follow-up via the persistent input queues it and threads it a
     // The follow-up renders immediately inside the thread, and Send all's
     // counter reflects it as a queued item awaiting submission.
     await expect(bubble.locator(".bubble-thread .bubble-comment")).toHaveText("still unclear, can you say more?");
+    await expect(bubble.locator(".bubble-thread .me-label")).toHaveText("ME");
     await expect(page.locator("#send-all")).toHaveText("Send all (1)");
 
     await page.locator("#send-all").click();
@@ -96,7 +109,7 @@ test("submitting a follow-up via the persistent input queues it and threads it a
   }
 });
 
-test("a reply to an annotation that already moved into the history group still renders correctly", async ({ page }) => {
+test("a reply to an already-sent annotation still renders correctly after an unrelated reload", async ({ page }) => {
   const { dir, artifactPath, handle } = await startWithFixture("bubble-queue.html", 6210);
   const { writeFileSync } = await import("node:fs");
   try {
@@ -105,16 +118,19 @@ test("a reply to an annotation that already moved into the history group still r
     const id = await page.locator(".bubble").getAttribute("data-annotation-id");
 
     writeFileSync(artifactPath, "<html><body><div id=\"near-top\">A</div></body></html>");
-    await expect(page.locator("#history-group")).toBeVisible({ timeout: 3000 });
+    await page.waitForTimeout(500); // let the reload settle
+
+    // Sent bubbles stay directly in the rail — there is no separate
+    // collapsed "Processed" group to move into.
+    await expect(page.locator(".bubble-sent")).toBeVisible();
 
     await fetch(new URL("/reply", handle.url), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, text: "answered after history move" }),
+      body: JSON.stringify({ id, text: "answered after reload" }),
     });
 
-    await page.locator("#history-header").click();
-    await expect(page.locator("#history-list .answer-block .answer-text")).toHaveText("answered after history move");
+    await expect(page.locator(".bubble .answer-block .answer-text")).toHaveText("answered after reload");
   } finally {
     await cleanup(dir, handle);
   }

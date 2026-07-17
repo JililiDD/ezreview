@@ -5,7 +5,7 @@ import { extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openInBrowser } from "./browser.js";
 import { openIdempotently, type IdempotentOpenOptions, type IdempotentOpenResult } from "./idempotent-open.js";
-import { waitForFeedback, WaitError } from "./wait.js";
+import { waitForFeedback, WaitError, ReviewConfirmed } from "./wait.js";
 import { sendReply, ReplyError } from "./reply.js";
 
 export const USAGE = `Usage:
@@ -130,6 +130,10 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       process.stdout.write(`${rendered}\n`);
       return 0;
     } catch (err) {
+      if (err instanceof ReviewConfirmed) {
+        process.stdout.write(`${err.message}\n`);
+        return 0;
+      }
       if (err instanceof WaitError) {
         process.stderr.write(`Error: ${err.message}\n`);
         return 1;

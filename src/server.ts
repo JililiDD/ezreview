@@ -173,6 +173,11 @@ export function createRequestHandler(
       resetSessionFiles(sessionDir);
       res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
       res.end(JSON.stringify({ ok: true }));
+      // Broadcast before shutting down so any client waiting on /events —
+      // in particular `wait`, which otherwise cannot tell a deliberate
+      // confirm-close apart from an idle-exit or a crash — knows this
+      // disconnect means the human ended the review, not an accident.
+      sseHub.broadcast("confirmed", {});
       onConfirmDocument();
       return;
     }

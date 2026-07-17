@@ -121,6 +121,11 @@ export function renderShellPage(): string {
     font-size: 12.5px;
     cursor: pointer;
   }
+  #confirm-document:disabled {
+    background: var(--chrome-border);
+    color: var(--chrome-dim);
+    cursor: default;
+  }
   #send-all {
     background: var(--accent);
     color: #fff;
@@ -206,6 +211,25 @@ export function renderShellPage(): string {
   #rail-footer #send-all {
     width: 100%;
   }
+  #reply-spinner {
+    display: none;
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+    margin-right: 8px;
+    border: 2px solid var(--chrome-border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: reply-spinner-spin 0.8s linear infinite;
+  }
+  #reply-spinner.visible {
+    display: block;
+  }
+  @keyframes reply-spinner-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
   .bubble-thread {
     max-height: 300px;
     overflow-y: auto;
@@ -237,6 +261,7 @@ export function renderShellPage(): string {
       <button id="rail-collapse" title="Collapse comments">‹</button>
       <div id="rail-scroll"></div>
       <div id="rail-footer">
+        <span id="reply-spinner" title="Waiting for the agent to reply"></span>
         <button id="send-all">Send all (0)</button>
       </div>
     </div>

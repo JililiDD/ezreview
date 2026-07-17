@@ -30,7 +30,6 @@ export function renderClientScript(): string {
     currentHoverTarget = null;
     hideHighlight();
     markTextAnnotationsLost();
-    moveSentItemsIntoHistory();
     if (draftBubble) {
       closeDraftBubble();
       statusText.textContent = "Selection cleared — please reselect";
@@ -44,6 +43,8 @@ export function renderClientScript(): string {
 
   source.addEventListener("reply", function (e) {
     var data = JSON.parse(e.data);
+    delete pendingReplyIds[data.id];
+    updateReplySpinner();
     var node = findAnnotationNodeById(data.id);
     if (!node) return;
     renderAnswer(node, data.text);
@@ -235,10 +236,20 @@ export function renderClientScript(): string {
   var textHighlightSet = null;
   var textHighlightHoverSet = null;
 
+  // Tracks which iframe *document* the registry was last built for — a real
+  // frame reload gets a brand-new document (needs a fresh registry), but a
+  // Review-toggle re-attach on the same still-loaded document must not
+  // recreate it: that would replace textHighlightSet/textHighlightHoverSet
+  // with new, empty Highlight() instances, silently dropping every range
+  // already added for queued/sent text annotations.
+  var textHighlightRegistryDoc = null;
+
   function setupTextHighlightRegistry() {
     var win = getIframeWindow();
     var doc = getIframeDoc();
     if (!win || !doc || !win.Highlight || !win.CSS || !win.CSS.highlights) return;
+    if (doc === textHighlightRegistryDoc) return;
+    textHighlightRegistryDoc = doc;
 
     var style = doc.createElement("style");
     style.textContent =
@@ -258,6 +269,7 @@ export function renderClientScript(): string {
   }
 
   function onIframeMouseUp() {
+    if (!reviewOn) return;
     var doc = getIframeDoc();
     var sel = doc && doc.getSelection ? doc.getSelection() : null;
     if (sel && sel.toString().length > 0 && sel.rangeCount > 0) {
@@ -265,11 +277,23 @@ export function renderClientScript(): string {
     }
   }
 
+  // setupTextHighlightRegistry() runs unconditionally on every frame load —
+  // it only prepares the CSS Custom Highlight API registry that already-
+  // queued/sent text annotations render into (and reanchorLostTextAnnotations,
+  // called right after, needs it ready regardless of the Review toggle).
+  // Only the mouseup listener that STARTS a new draft is Review-gated, mirroring
+  // onIframeClick's element-annotation equivalent (listener attach/detach here,
+  // plus the internal reviewOn guard above as defense in depth).
   function attachSelectionListeners() {
     var doc = getIframeDoc();
     if (!doc) return;
     doc.addEventListener("mouseup", onIframeMouseUp);
     setupTextHighlightRegistry();
+  }
+
+  function detachSelectionListeners() {
+    var doc = getIframeDoc();
+    if (doc) doc.removeEventListener("mouseup", onIframeMouseUp);
   }
 
   // ---- Comment rail: resize + collapse ----
@@ -291,7 +315,6 @@ export function renderClientScript(): string {
     railCollapseBtn.textContent = railCollapsed ? "›" : "‹";
     railScroll.style.display = railCollapsed ? "none" : "block";
     railFooter.style.display = railCollapsed ? "none" : "flex";
-    renderHistoryGroup();
   }
 
   railCollapseBtn.addEventListener("click", function () {
@@ -327,62 +350,20 @@ export function renderClientScript(): string {
   // ---- Bubble queue (draft -> queue -> delete; Send all is a placeholder) ----
 
   var sendAllButton = document.getElementById("send-all");
+  var replySpinner = document.getElementById("reply-spinner");
   var queue = [];
   window.__annotationQueue = queue;
   var draftBubble = null;
   var nextQueueId = 1;
   var sentItems = [];
   window.__sentAnnotations = sentItems;
-  var historyItems = [];
-  var historyExpanded = false;
+  // Root ids (never a follow-up's own id — replies always target the
+  // thread root) still awaiting at least one reply from the most recent
+  // Send all batch. The spinner shows while this is non-empty.
+  var pendingReplyIds = {};
 
-  // historyContainer is the first child ever appended to #rail-scroll, so it
-  // always renders above the queue/sent bubbles that follow it, regardless
-  // of insertion order after this point — normal document flow, no z-index
-  // or absolute-position bookkeeping needed.
-  var historyContainer = document.createElement("div");
-  historyContainer.id = "history-group";
-  historyContainer.style.display = "none";
-  historyContainer.style.marginBottom = "8px";
-  railScroll.appendChild(historyContainer);
-
-  var historyHeader = document.createElement("div");
-  historyHeader.id = "history-header";
-  historyHeader.style.background = "#fff";
-  historyHeader.style.border = "1px solid #e3e5e9";
-  historyHeader.style.borderRadius = "8px";
-  historyHeader.style.padding = "8px 12px";
-  historyHeader.style.cursor = "pointer";
-  historyHeader.style.fontSize = "13px";
-  historyHeader.style.boxSizing = "border-box";
-  historyContainer.appendChild(historyHeader);
-
-  var historyList = document.createElement("div");
-  historyList.id = "history-list";
-  historyList.style.marginTop = "8px";
-  historyContainer.appendChild(historyList);
-
-  function renderHistoryGroup() {
-    historyHeader.textContent = "Processed (" + historyItems.length + ")";
-    historyContainer.style.display = !railCollapsed && historyItems.length > 0 ? "block" : "none";
-    historyList.style.display = historyExpanded ? "block" : "none";
-  }
-
-  historyHeader.addEventListener("click", function () {
-    historyExpanded = !historyExpanded;
-    renderHistoryGroup();
-  });
-
-  function moveSentItemsIntoHistory() {
-    if (sentItems.length === 0) return;
-    for (var i = 0; i < sentItems.length; i++) {
-      var item = sentItems[i];
-      item.node.style.marginBottom = "8px";
-      historyList.appendChild(item.node);
-      historyItems.push(item);
-    }
-    sentItems.length = 0;
-    renderHistoryGroup();
+  function updateReplySpinner() {
+    replySpinner.classList.toggle("visible", Object.keys(pendingReplyIds).length > 0);
   }
 
   function updateSendAllLabel() {
@@ -435,7 +416,7 @@ export function renderClientScript(): string {
   }
 
   function findAnnotationNodeById(id) {
-    var lists = [sentItems, historyItems, queue];
+    var lists = [sentItems, queue];
     for (var i = 0; i < lists.length; i++) {
       for (var j = 0; j < lists[i].length; j++) {
         if (lists[i][j].id === id) return lists[i][j].node;
@@ -453,6 +434,19 @@ export function renderClientScript(): string {
       container = document.createElement("div");
       container.className = "bubble-thread";
       node.appendChild(container);
+      // markBubbleSent (which appends the Reply button / follow-up controls)
+      // runs at send time, before any agent reply exists — so this container
+      // is often created afterward and would otherwise land ABOVE those
+      // controls in the DOM. appendChild on an already-attached node moves
+      // it, so re-appending puts the controls back below the thread, always
+      // at the bubble's bottom-right regardless of creation order.
+      var existingReplyControls = node.querySelector(".followup-reply-btn, .followup-controls");
+      if (existingReplyControls) {
+        var controlsRoot = existingReplyControls.className === "followup-reply-btn"
+          ? existingReplyControls.parentNode
+          : existingReplyControls;
+        node.appendChild(controlsRoot);
+      }
     }
     return container;
   }
@@ -490,13 +484,37 @@ export function renderClientScript(): string {
     appendAnswerToThread(node, text);
   }
 
+  // Mirrors answerBlock's visual language (left accent bar + role label)
+  // for human messages — "bubble-comment" stays the text node's own class
+  // (existing tests assert its exact textContent, with no label mixed in).
+  function buildMeBlock(text) {
+    var meBlock = document.createElement("div");
+    meBlock.className = "me-block";
+    meBlock.style.paddingLeft = "8px";
+    meBlock.style.borderLeft = "3px solid var(--disconnect-red)";
+    meBlock.style.background = "#fef4f3";
+
+    var meLabel = document.createElement("div");
+    meLabel.className = "me-label";
+    meLabel.textContent = "ME";
+    meLabel.style.fontSize = "10px";
+    meLabel.style.fontWeight = "bold";
+    meLabel.style.color = "var(--disconnect-red)";
+    meBlock.appendChild(meLabel);
+
+    var commentText = document.createElement("div");
+    commentText.className = "bubble-comment";
+    commentText.textContent = text;
+    meBlock.appendChild(commentText);
+
+    return meBlock;
+  }
+
   function appendFollowUpToThread(node, text) {
     var container = getOrCreateThreadContainer(node);
-    var followUp = document.createElement("div");
-    followUp.className = "bubble-comment";
-    followUp.style.marginTop = "6px";
-    followUp.textContent = text;
-    container.appendChild(followUp);
+    var meBlock = buildMeBlock(text);
+    meBlock.style.marginTop = "6px";
+    container.appendChild(meBlock);
     container.scrollTop = container.scrollHeight;
   }
 
@@ -639,11 +657,6 @@ export function renderClientScript(): string {
     // the pre-reload iframe document, so it goes stale the moment this
     // reload's frame.src reassignment replaces that document — regardless
     // of whether the annotation is still queued or has already been sent.
-    // historyItems don't need their own pass here: an item only reaches
-    // historyItems via moveSentItemsIntoHistory, which this same reload
-    // handler runs right after this function — so by the time an item
-    // enters historyItems, it has already been marked lost while still in
-    // sentItems on that same reload.
     var lists = [queue, sentItems];
     for (var l = 0; l < lists.length; l++) {
       for (var i = 0; i < lists[l].length; i++) {
@@ -765,11 +778,7 @@ export function renderClientScript(): string {
   }
 
   function reanchorLostTextAnnotations() {
-    // historyItems included here (unlike markTextAnnotationsLost above):
-    // by the time this runs — after the new document has finished loading —
-    // this reload's moveSentItemsIntoHistory call has already moved items
-    // that were in sentItems a moment ago into historyItems.
-    var lists = [queue, sentItems, historyItems];
+    var lists = [queue, sentItems];
     for (var l = 0; l < lists.length; l++) {
       for (var i = 0; i < lists[l].length; i++) {
         var item = lists[l][i];
@@ -802,10 +811,8 @@ export function renderClientScript(): string {
     node.style.top = "";
     node.style.width = "";
     node.style.zIndex = "";
-    var text = document.createElement("div");
-    text.className = "bubble-comment";
-    text.textContent = comment;
-    text.style.paddingRight = "18px";
+    var meBlock = buildMeBlock(comment);
+    meBlock.style.paddingRight = "18px";
     var deleteBtn = document.createElement("button");
     deleteBtn.className = "bubble-delete";
     deleteBtn.textContent = "×";
@@ -823,7 +830,7 @@ export function renderClientScript(): string {
     deleteBtn.style.cursor = "pointer";
     deleteBtn.style.borderRadius = "4px";
     deleteBtn.style.padding = "0";
-    node.appendChild(text);
+    node.appendChild(meBlock);
     node.appendChild(deleteBtn);
 
     var id = "a-" + nextQueueId++;
@@ -1064,21 +1071,26 @@ export function renderClientScript(): string {
   function addFollowUpControls(node, rootId) {
     if (node.querySelector(".followup-controls") || node.querySelector(".followup-reply-btn")) return;
 
+    var replyBtnRow = document.createElement("div");
+    replyBtnRow.style.display = "flex";
+    replyBtnRow.style.justifyContent = "flex-end";
+    replyBtnRow.style.marginTop = "8px";
+
     var replyBtn = document.createElement("button");
     replyBtn.className = "followup-reply-btn";
     replyBtn.textContent = "Reply";
-    replyBtn.style.marginTop = "8px";
-    replyBtn.style.background = "transparent";
-    replyBtn.style.border = "1px solid #e3e5e9";
+    replyBtn.style.background = "var(--accent)";
+    replyBtn.style.color = "#fff";
+    replyBtn.style.border = "none";
     replyBtn.style.borderRadius = "6px";
-    replyBtn.style.padding = "4px 10px";
+    replyBtn.style.padding = "4px 12px";
     replyBtn.style.fontSize = "12px";
-    replyBtn.style.color = "var(--chrome-dim)";
     replyBtn.style.cursor = "pointer";
-    node.appendChild(replyBtn);
+    replyBtnRow.appendChild(replyBtn);
+    node.appendChild(replyBtnRow);
 
     replyBtn.addEventListener("click", function () {
-      replyBtn.remove();
+      replyBtnRow.remove();
 
       var wrap = document.createElement("div");
       wrap.className = "followup-controls";
@@ -1132,14 +1144,6 @@ export function renderClientScript(): string {
     if (deleteBtn) deleteBtn.remove();
     node.classList.add("bubble-sent");
     node.style.background = "#f2f2f2";
-    var badge = document.createElement("span");
-    badge.className = "sent-badge";
-    badge.textContent = "✓ Sent · awaiting agent edits";
-    badge.style.display = "inline-block";
-    badge.style.marginTop = "4px";
-    badge.style.fontSize = "11px";
-    badge.style.color = "#555";
-    node.appendChild(badge);
     addFollowUpControls(node, node.getAttribute("data-annotation-id"));
   }
 
@@ -1165,16 +1169,21 @@ export function renderClientScript(): string {
           return;
         }
         for (var i = 0; i < queue.length; i++) {
+          var item = queue[i];
+          // A follow-up's own id never receives a reply — the agent always
+          // replies to the thread's root id — so track that instead.
+          pendingReplyIds[item.type === "follow-up" ? item.replyToId : item.id] = true;
           // Follow-up items have no bubble of their own (queueFollowUp
           // already rendered the message inline into the root bubble's
           // thread) — only new-annotation items go through the normal
           // sent/history bubble lifecycle.
-          if (queue[i].type === "follow-up") continue;
-          markBubbleSent(queue[i].node);
-          sentItems.push(queue[i]);
+          if (item.type === "follow-up") continue;
+          markBubbleSent(item.node);
+          sentItems.push(item);
         }
         queue.length = 0;
         updateSendAllLabel();
+        updateReplySpinner();
         layoutBubbles();
       })
       .catch(function () {
@@ -1190,7 +1199,18 @@ export function renderClientScript(): string {
     if (!window.confirm("Confirm this document is done? All feedback history will be deleted.")) {
       return;
     }
-    fetch("/confirm-document", { method: "POST" }).catch(function () {});
+    fetch("/confirm-document", { method: "POST" })
+      .then(function (res) {
+        if (!res.ok) {
+          showSendFailure("Confirm failed — please retry");
+          return;
+        }
+        confirmDocumentButton.disabled = true;
+        confirmDocumentButton.textContent = "Confirmed";
+      })
+      .catch(function () {
+        showSendFailure("Confirm failed — network error");
+      });
   });
 
   function onIframeClick(e) {
@@ -1248,8 +1268,10 @@ export function renderClientScript(): string {
     reviewSwitch.setAttribute("data-on", reviewOn ? "true" : "false");
     if (reviewOn) {
       attachOverlayListeners();
+      attachSelectionListeners();
     } else {
       detachOverlayListeners();
+      detachSelectionListeners();
     }
   });
 

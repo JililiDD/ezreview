@@ -35,6 +35,36 @@ describe("POST /confirm-document", () => {
     }
   });
 
+  test("broadcasts a confirmed SSE event to connected clients before shutting down", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-confirm-document-sse-test-"));
+    const artifactPath = join(dir, "demo.html");
+    writeFileSync(artifactPath, "<html></html>");
+    const sessionDir = join(dir, "session");
+    const handle = await startReviewServer({ artifactPath, basePort: 5985, sessionDir });
+
+    try {
+      const controller = new AbortController();
+      const res = await fetch(new URL("/events", handle.url), {
+        headers: { Accept: "text/event-stream" },
+        signal: controller.signal,
+      });
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      await reader.read(); // consume ":ok"
+
+      await fetch(new URL("/confirm-document", handle.url), { method: "POST" });
+
+      const { value } = await reader.read();
+      const chunk = decoder.decode(value);
+      assert.match(chunk, /^event: confirmed\n/);
+
+      controller.abort();
+    } finally {
+      await handle.close().catch(() => {});
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("does not error when persisted files never existed", async () => {
     const dir = mkdtempSync(join(tmpdir(), "ai-review-board-confirm-document-empty-test-"));
     const artifactPath = join(dir, "demo.html");

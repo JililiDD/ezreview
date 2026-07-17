@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startReviewServer } from "../src/server.js";
 import { sessionDirFor, writeSessionInfo } from "../src/session.js";
-import { waitForFeedback, renderBatch, WaitError } from "../src/wait.js";
+import { waitForFeedback, renderBatch, WaitError, ReviewConfirmed } from "../src/wait.js";
 import { appendThreadMessage } from "../src/feedback-queue.js";
 
 async function setUp(basePort: number) {
@@ -197,6 +197,20 @@ describe("waitForFeedback", () => {
       await handle.close().catch(() => {});
       rmSync(dir, { recursive: true, force: true });
       rmSync(sessionRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("throws ReviewConfirmed (not WaitError) when the server broadcasts a confirmed event, e.g. from Confirm document", async () => {
+    const ctx = await setUp(5727);
+    try {
+      const waitPromise = waitForFeedback(ctx.artifactPath, { sessionRoot: ctx.sessionRoot });
+      setTimeout(() => {
+        ctx.handle.sseHub.broadcast("confirmed", {});
+      }, 200);
+
+      await assert.rejects(() => waitPromise, ReviewConfirmed);
+    } finally {
+      await tearDown(ctx);
     }
   });
 

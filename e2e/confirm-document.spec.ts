@@ -83,6 +83,8 @@ test("clicking Confirm document with an empty queue shows a native confirm dialo
     await expect.poll(() => dialogMessage).not.toBe("");
     expect(dialogMessage.length).toBeGreaterThan(0);
 
+    await expect(page.locator("#confirm-document")).toHaveText("Confirmed");
+    await expect(page.locator("#confirm-document")).toBeDisabled();
     await expect(page.locator("#status-dot")).toHaveClass(/disconnected/, { timeout: 3000 });
     expect(existsSync(join(sessionDir, "threads.jsonl"))).toBe(false);
     expect(existsSync(join(sessionDir, "feedback-queue.jsonl"))).toBe(false);

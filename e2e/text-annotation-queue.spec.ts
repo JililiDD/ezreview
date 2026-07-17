@@ -208,14 +208,10 @@ test("a text annotation that was already Sent before a reload is also marked los
     await queueCurrentSelection(page, "x");
 
     await page.locator("#send-all").click();
-    await expect(page.locator(".bubble .sent-badge")).toBeVisible();
+    await expect(page.locator(".bubble.bubble-sent")).toBeVisible();
 
     writeFileSync(localArtifact, "<html><body><p>totally different</p></body></html>");
     await page.waitForTimeout(1200);
-
-    // The reload also moves the now-Sent bubble into the collapsed
-    // "Processed" history group — expand it before hovering.
-    await page.locator("#history-header").click();
 
     const bubble = page.locator(".bubble");
     await bubble.hover();

@@ -45,8 +45,33 @@ test("Send all submits a real POST /feedback with the queued item's data and tra
     expect(typeof body[0].selector).toBe("string");
 
     await expect(page.locator(".bubble .bubble-delete")).toHaveCount(0);
-    await expect(page.locator(".bubble .sent-badge")).toHaveText("✓ Sent · awaiting agent edits");
     await expect(page.locator("#send-all")).toHaveText("Send all (0)");
+  } finally {
+    await cleanup(dir, handle);
+  }
+});
+
+test("Send all shows a reply-pending spinner until the agent replies to every submitted item", async ({ page }) => {
+  const { dir, handle } = await startWithFixture("bubble-queue.html", 5805);
+  try {
+    await page.goto(handle.url);
+    const frame = page.frameLocator("#artifact-frame");
+    await frame.locator("#near-top").click();
+    await page.locator(".bubble-draft textarea").fill("first question");
+    await page.locator(".bubble-draft .bubble-add").click();
+    await page.locator("#send-all").click();
+    await expect(page.locator(".bubble-sent")).toBeVisible();
+
+    await expect(page.locator("#reply-spinner")).toHaveClass(/visible/);
+
+    const id = await page.locator(".bubble").getAttribute("data-annotation-id");
+    await fetch(new URL("/reply", handle.url), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, text: "answer" }),
+    });
+
+    await expect(page.locator("#reply-spinner")).not.toHaveClass(/visible/);
   } finally {
     await cleanup(dir, handle);
   }
@@ -84,7 +109,7 @@ test("a sent element-annotation includes outerHTML truncated to 500 characters",
   }
 });
 
-test("sent bubbles move into a collapsed Processed (N) history group on the next reload", async ({ page }) => {
+test("sent bubbles stay directly in the rail across a reload, not moved into any collapsed group", async ({ page }) => {
   const { dir, artifactPath, handle } = await startWithFixture("bubble-queue.html", 5820);
   try {
     await page.goto(handle.url);
@@ -95,18 +120,10 @@ test("sent bubbles move into a collapsed Processed (N) history group on the next
     await page.locator("#send-all").click();
     await expect(page.locator(".bubble-sent")).toBeVisible();
 
-    await expect(page.locator("#history-group")).not.toBeVisible();
-
     writeFileSync(artifactPath, "<html><body><div id=\"near-top\">A</div><div id=\"near-top-2\">B</div></body></html>");
+    await page.waitForTimeout(500); // let the reload settle
 
-    const historyGroup = page.locator("#history-group");
-    await expect(historyGroup).toBeVisible({ timeout: 3000 });
-    await expect(page.locator("#history-header")).toHaveText("Processed (1)");
-    await expect(page.locator("#history-list")).not.toBeVisible();
-
-    await page.locator("#history-header").click();
-    await expect(page.locator("#history-list")).toBeVisible();
-    await expect(page.locator("#history-list .bubble-sent")).toBeVisible();
+    await expect(page.locator(".bubble-sent")).toBeVisible();
   } finally {
     await cleanup(dir, handle);
   }

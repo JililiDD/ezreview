@@ -6,6 +6,12 @@ import { consumeNextBatch, loadThreadHistory } from "./feedback-queue.js";
 
 export class WaitError extends Error {}
 
+// Not an error: signals a deliberate "Confirm document" click, distinct from
+// an idle-exit/crash/network-blip disconnect (both of which throw WaitError).
+// The CLI exits 0 on this, not 1 — the review ended on purpose, so a caller
+// must not treat it as a failure worth retrying.
+export class ReviewConfirmed extends Error {}
+
 export interface AnnotationItem {
   id: string;
   type?: string;
@@ -139,6 +145,9 @@ export async function waitForFeedback(file: string, opts: WaitOptions = {}): Pro
         return renderBatch(batch, sessionDir);
       }
       const chunk = await nextSseChunk(reader, decoder, state);
+      if (chunk.startsWith("event: confirmed")) {
+        throw new ReviewConfirmed("Review confirmed complete — no further feedback will arrive.");
+      }
       if (!chunk.startsWith("event: feedback")) {
         continue; // ignore reload/other event types; loop back to re-check the file
       }
