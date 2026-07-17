@@ -376,7 +376,8 @@ export function renderClientScript(): string {
   railGrip.addEventListener("pointermove", function (e) {
     if (!railResizing) return;
     var newWidth = window.innerWidth - e.clientX;
-    railWidth = Math.max(RAIL_MIN_WIDTH, Math.min(RAIL_MAX_WIDTH, newWidth));
+    var maxWidth = Math.max(RAIL_MAX_WIDTH, window.innerWidth / 2);
+    railWidth = Math.max(RAIL_MIN_WIDTH, Math.min(maxWidth, newWidth));
     applyRailWidth();
   });
   railGrip.addEventListener("pointerup", function (e) {
