@@ -982,8 +982,8 @@ export function renderClientScript(): string {
     var afterText = afterRange.toString();
 
     return {
-      before: beforeText.slice(-50),
-      after: afterText.slice(0, 50),
+      before: beforeText.slice(-25),
+      after: afterText.slice(0, 25),
     };
   }
 
