@@ -10,7 +10,7 @@ let artifactPath: string;
 let handle: ReviewServerHandle;
 
 test.beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "ai-review-board-hover-linkage-e2e-"));
+  dir = mkdtempSync(join(tmpdir(), "ezreview-hover-linkage-e2e-"));
   artifactPath = join(dir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "bubble-queue.html"), artifactPath);
   handle = await startReviewServer({ artifactPath, basePort: 5300 });
@@ -60,7 +60,7 @@ test("moving off the bubble hides the highlight", async ({ page }) => {
 });
 
 test("hovering a bubble that requires scrolling doesn't get its highlight stolen by a stale iframe hover", async ({ page }) => {
-  const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-hover-linkage-scroll-e2e-"));
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-hover-linkage-scroll-e2e-"));
   const localArtifact = join(localDir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "hover-linkage-scroll.html"), localArtifact);
   const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5320 });
@@ -103,7 +103,7 @@ test("hovering a bubble that requires scrolling doesn't get its highlight stolen
 });
 
 test("a queued bubble whose source element was removed shows Anchor lost and does not highlight", async ({ page }) => {
-  const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-hover-linkage-lost-e2e-"));
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-hover-linkage-lost-e2e-"));
   const localArtifact = join(localDir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "bubble-queue.html"), localArtifact);
   const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5310 });

@@ -9,7 +9,7 @@ let dir: string;
 let handle: ReviewServerHandle;
 
 test.beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "ai-review-board-overlay-e2e-"));
+  dir = mkdtempSync(join(tmpdir(), "ezreview-overlay-e2e-"));
   const artifactPath = join(dir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "hover-highlight.html"), artifactPath);
   handle = await startReviewServer({ artifactPath, basePort: 4800 });
@@ -80,7 +80,7 @@ test("Review off: no highlight and no listener interference", async ({ page }) =
 });
 
 test("a live-reload while hovering clears the now-stale highlight box", async ({ page }) => {
-  const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-overlay-reload-e2e-"));
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-overlay-reload-e2e-"));
   const artifactPath = join(localDir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "hover-highlight.html"), artifactPath);
   const localHandle = await startReviewServer({ artifactPath, basePort: 4830 });

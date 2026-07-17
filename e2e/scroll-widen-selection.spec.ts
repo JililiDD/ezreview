@@ -9,7 +9,7 @@ let dir: string;
 let handle: ReviewServerHandle;
 
 test.beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "ai-review-board-scroll-widen-e2e-"));
+  dir = mkdtempSync(join(tmpdir(), "ezreview-scroll-widen-e2e-"));
   const artifactPath = join(dir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "table.html"), artifactPath);
   handle = await startReviewServer({ artifactPath, basePort: 6030 });

@@ -13,7 +13,7 @@ export function sessionHash(filePath: string): string {
   return createHash("sha256").update(normalized).digest("hex").slice(0, 16);
 }
 
-export function sessionDirFor(filePath: string, root: string = join(homedir(), ".ai-review-board")): string {
+export function sessionDirFor(filePath: string, root: string = join(homedir(), ".ezreview")): string {
   return join(root, sessionHash(filePath));
 }
 

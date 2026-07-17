@@ -9,7 +9,7 @@ let dir: string;
 let handle: ReviewServerHandle;
 
 test.beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "ai-review-board-bubble-e2e-"));
+  dir = mkdtempSync(join(tmpdir(), "ezreview-bubble-e2e-"));
   const artifactPath = join(dir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "bubble-queue.html"), artifactPath);
   handle = await startReviewServer({ artifactPath, basePort: 5200 });
@@ -81,7 +81,7 @@ test("Cancel discards the draft without touching the queue", async ({ page }) =>
   await draft.locator(".bubble-cancel").click();
 
   await expect(page.locator(".bubble-draft")).toHaveCount(0);
-  await expect(page.locator("#send-all")).toHaveText("Send all (0)");
+  await expect(page.locator("#send-all")).toHaveText("Submit review (0)");
 });
 
 test("Add to queue transitions the bubble to queue state and increments the count", async ({ page }) => {
@@ -98,7 +98,7 @@ test("Add to queue transitions the bubble to queue state and increments the coun
   await expect(queued).toHaveCount(1);
   await expect(queued.locator(".bubble-comment")).toHaveText("too light");
   await expect(queued.locator(".bubble-delete")).toBeVisible();
-  await expect(page.locator("#send-all")).toHaveText("Send all (1)");
+  await expect(page.locator("#send-all")).toHaveText("Submit review (1)");
 });
 
 test("Delete removes a queued bubble and decrements the count", async ({ page }) => {
@@ -107,12 +107,12 @@ test("Delete removes a queued bubble and decrements the count", async ({ page })
   await frame.locator("#near-top").click();
   await page.locator(".bubble-draft textarea").fill("x");
   await page.locator(".bubble-draft .bubble-add").click();
-  await expect(page.locator("#send-all")).toHaveText("Send all (1)");
+  await expect(page.locator("#send-all")).toHaveText("Submit review (1)");
 
   await page.locator(".bubble .bubble-delete").click();
 
   await expect(page.locator(".bubble")).toHaveCount(0);
-  await expect(page.locator("#send-all")).toHaveText("Send all (0)");
+  await expect(page.locator("#send-all")).toHaveText("Submit review (0)");
 });
 
 test("two queued bubbles with close anchors stack without overlapping", async ({ page }) => {

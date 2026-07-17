@@ -6,7 +6,7 @@ import { startReviewServer } from "../src/server.ts";
 import type { ReviewServerHandle } from "../src/server.ts";
 
 async function startWithFixture(fixtureName: string, basePort: number) {
-  const dir = mkdtempSync(join(tmpdir(), "ai-review-board-reply-e2e-"));
+  const dir = mkdtempSync(join(tmpdir(), "ezreview-reply-e2e-"));
   const artifactPath = join(dir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", fixtureName), artifactPath);
   const handle = await startReviewServer({ artifactPath, basePort });
@@ -100,10 +100,10 @@ test("submitting a follow-up via the persistent input queues it and threads it a
     // counter reflects it as a queued item awaiting submission.
     await expect(bubble.locator(".bubble-thread .bubble-comment")).toHaveText("still unclear, can you say more?");
     await expect(bubble.locator(".bubble-thread .me-label")).toHaveText("ME");
-    await expect(page.locator("#send-all")).toHaveText("Send all (1)");
+    await expect(page.locator("#send-all")).toHaveText("Submit review (1)");
 
     await page.locator("#send-all").click();
-    await expect(page.locator("#send-all")).toHaveText("Send all (0)");
+    await expect(page.locator("#send-all")).toHaveText("Submit review (0)");
   } finally {
     await cleanup(dir, handle);
   }

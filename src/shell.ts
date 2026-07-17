@@ -5,7 +5,7 @@ export function renderShellPage(): string {
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8" />
-<title>ai-review-board</title>
+<title>ezreview</title>
 <style>
   :root[data-theme="dark"] {
     --chrome-bg: rgba(18, 24, 38, 0.72);
@@ -426,7 +426,7 @@ export function renderShellPage(): string {
 </head>
 <body>
   <div id="toolbar">
-    <span id="wordmark">ai-review-board</span>
+    <span id="wordmark">ezreview</span>
     <div id="file-status">
       <span id="status-dot"></span>
       <span id="file-name">Agent connected</span>
@@ -434,13 +434,13 @@ export function renderShellPage(): string {
     </div>
     <div id="spacer"></div>
     <div id="review-toggle">
-      <span>Review</span>
+      <span>REVIEW MODE</span>
       <span class="switch" id="review-switch" data-on="true"><span class="switch-knob"></span></span>
     </div>
     <span id="scroll-hint">Scroll while hovering to widen the selection</span>
     <div id="spacer-2"></div>
     <button id="theme-toggle" title="Toggle light/dark theme">☀︎</button>
-    <button id="confirm-document">Confirm document</button>
+    <button id="confirm-document">Approve</button>
   </div>
   <div id="stage">
     <div id="artifact-pane">
@@ -453,7 +453,7 @@ export function renderShellPage(): string {
       <div id="rail-scroll"></div>
       <div id="rail-footer">
         <span id="reply-spinner" title="Waiting for the agent to reply"></span>
-        <button id="send-all">Send all (0)</button>
+        <button id="send-all">Submit review (0)</button>
       </div>
     </div>
   </div>

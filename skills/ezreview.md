@@ -1,17 +1,17 @@
-# ai-review-board — agent usage guide
+# ezreview — agent usage guide
 
-`ai-review-board` closes the loop between an agent that writes HTML artifacts and a human who reviews them in a browser. The human annotates the rendered artifact directly (clicking elements, selecting text); the agent reads those annotations back as structured, Edit-ready text and either edits the file or answers a question.
+`ezreview` closes the loop between an agent that writes HTML artifacts and a human who reviews them in a browser. The human annotates the rendered artifact directly (clicking elements, selecting text); the agent reads those annotations back as structured, Edit-ready text and either edits the file or answers a question.
 
 This document assumes no prior knowledge of the tool beyond what's written here.
 
 ## The three commands
 
-### `ai-review-board <file.html>` (no subcommand) — open a review session
+### `ezreview <file.html>` (no subcommand) — open a review session
 
 Starts a local server, opens the artifact in the reviewer's browser, and prints the URL to stdout. There is no `open` subcommand — just pass the file path directly as the only argument, as shown below.
 
 ```
-ai-review-board report.html
+ezreview report.html
 ```
 
 - **It is a foreground process.** It does not return until you kill it (Ctrl+C) or the server auto-exits after 10 minutes with no client connected (neither a browser tab nor a blocked `wait` call). Because of this, launch it with your host's background-task mechanism (the same way you'd launch any long-running dev server) rather than waiting on it synchronously.
@@ -19,10 +19,10 @@ ai-review-board report.html
 - It binds to `127.0.0.1` only (no LAN/remote access).
 - If `<file.html>` doesn't exist, all three commands (`open`, `wait`, `reply`) fail the same way: an `Error: File not found: <path>` message on stderr and a non-zero exit — check the path if you see this.
 
-### `ai-review-board wait <file.html>` — block until the next batch of feedback
+### `ezreview wait <file.html>` — block until the next batch of feedback
 
 ```
-ai-review-board wait report.html
+ezreview wait report.html
 ```
 
 - Blocks until the reviewer clicks "Send all" in the browser, then prints one batch of annotations as structured, readable text to stdout and exits 0.
@@ -32,10 +32,10 @@ ai-review-board wait report.html
 - If there is no running session for the file (you haven't called `open` yet, or the server has since auto-exited), `wait` fails immediately with a clear error instead of hanging — run `open` first.
 - Annotation ids and "has this been answered" state are durable — they survive an idle auto-exit + restart, so an id from an old `wait` batch is still valid to `reply` to even if the session restarted in between.
 
-### `ai-review-board reply <file.html> --to <id> "<answer text>"` — answer a question
+### `ezreview reply <file.html> --to <id> "<answer text>"` — answer a question
 
 ```
-ai-review-board reply report.html --to a-3 "It's the API's required timezone format, not a bug."
+ezreview reply report.html --to a-3 "It's the API's required timezone format, not a bug."
 ```
 
 - Use this for annotations that are **questions**, not change requests — see the triage rule below.

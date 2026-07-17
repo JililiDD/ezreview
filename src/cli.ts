@@ -9,9 +9,9 @@ import { waitForFeedback, WaitError, ReviewConfirmed } from "./wait.js";
 import { sendReply, ReplyError } from "./reply.js";
 
 export const USAGE = `Usage:
-  ai-review-board <file.html>                          Open a review server
-  ai-review-board wait <file.html>                      Block until the next feedback batch
-  ai-review-board reply <file.html> --to <id> "<text>"  Answer a question-type annotation
+  ezreview <file.html>                          Open a review server
+  ezreview wait <file.html>                      Block until the next feedback batch
+  ezreview reply <file.html> --to <id> "<text>"  Answer a question-type annotation
 
 Options:
   -h, --help    Show this help message

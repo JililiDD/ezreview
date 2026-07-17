@@ -6,7 +6,7 @@ import { startReviewServer } from "../src/server.ts";
 import type { ReviewServerHandle } from "../src/server.ts";
 
 async function startWithFixture(fixtureName: string, basePort: number) {
-  const dir = mkdtempSync(join(tmpdir(), "ai-review-board-send-all-e2e-"));
+  const dir = mkdtempSync(join(tmpdir(), "ezreview-send-all-e2e-"));
   const artifactPath = join(dir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", fixtureName), artifactPath);
   const handle = await startReviewServer({ artifactPath, basePort });
@@ -45,7 +45,7 @@ test("Send all submits a real POST /feedback with the queued item's data and tra
     expect(typeof body[0].selector).toBe("string");
 
     await expect(page.locator(".bubble .bubble-delete")).toHaveCount(0);
-    await expect(page.locator("#send-all")).toHaveText("Send all (0)");
+    await expect(page.locator("#send-all")).toHaveText("Submit review (0)");
   } finally {
     await cleanup(dir, handle);
   }
@@ -202,7 +202,7 @@ test("a failed submission (non-ok response) surfaces an error and leaves the que
     await expect(page.locator("#status-text")).toHaveText("Send failed — please retry");
     await expect(page.locator(".bubble-sent")).toHaveCount(0);
     await expect(page.locator(".bubble .bubble-delete")).toHaveCount(1);
-    await expect(page.locator("#send-all")).toHaveText("Send all (1)");
+    await expect(page.locator("#send-all")).toHaveText("Submit review (1)");
   } finally {
     await cleanup(dir, handle);
   }
@@ -223,7 +223,7 @@ test("a network-level failure (fetch rejects) also surfaces an error and leaves 
 
     await expect(page.locator("#status-text")).toHaveText("Send failed — network error");
     await expect(page.locator(".bubble-sent")).toHaveCount(0);
-    await expect(page.locator("#send-all")).toHaveText("Send all (1)");
+    await expect(page.locator("#send-all")).toHaveText("Submit review (1)");
   } finally {
     await cleanup(dir, handle);
   }

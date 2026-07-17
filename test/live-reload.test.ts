@@ -35,7 +35,7 @@ describe("watcher -> broadcast -> SSE client end-to-end", () => {
   let handle: ReviewServerHandle;
 
   before(async () => {
-    dir = mkdtempSync(join(tmpdir(), "ai-review-board-live-reload-test-"));
+    dir = mkdtempSync(join(tmpdir(), "ezreview-live-reload-test-"));
     artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html>v0</html>");
     handle = await startReviewServer({ artifactPath, basePort: 5000 });
@@ -60,7 +60,7 @@ describe("watcher -> broadcast -> SSE client end-to-end", () => {
   });
 
   test("closing the server stops the watcher (no lingering broadcast after close)", async () => {
-    const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-live-reload-close-test-"));
+    const localDir = mkdtempSync(join(tmpdir(), "ezreview-live-reload-close-test-"));
     const localArtifact = join(localDir, "demo.html");
     writeFileSync(localArtifact, "<html>v0</html>");
     const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5010 });

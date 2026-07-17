@@ -6,7 +6,7 @@ import { startReviewServer } from "../src/server.ts";
 import type { ReviewServerHandle } from "../src/server.ts";
 
 async function startWithFixture(fixtureName: string, basePort: number) {
-  const dir = mkdtempSync(join(tmpdir(), "ai-review-board-confirm-document-e2e-"));
+  const dir = mkdtempSync(join(tmpdir(), "ezreview-confirm-document-e2e-"));
   const artifactPath = join(dir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", fixtureName), artifactPath);
   const sessionDir = join(dir, "session");
@@ -26,8 +26,8 @@ test("Confirm document sits in the toolbar's former Send all slot; Send all now 
   try {
     await page.goto(handle.url);
 
-    await expect(page.locator("#toolbar #confirm-document")).toHaveText("Confirm document");
-    await expect(page.locator("#rail-footer #send-all")).toHaveText("Send all (0)");
+    await expect(page.locator("#toolbar #confirm-document")).toHaveText("Approve");
+    await expect(page.locator("#rail-footer #send-all")).toHaveText("Submit review (0)");
   } finally {
     await cleanup(dir, handle);
   }
@@ -97,7 +97,7 @@ test("Cancel on the confirm modal leaves the document editable", async ({ page }
 
     await page.locator("#confirm-modal-cancel").click();
     await expect(page.locator("#confirm-modal-backdrop")).not.toHaveClass(/visible/);
-    await expect(page.locator("#confirm-document")).toHaveText("Confirm document");
+    await expect(page.locator("#confirm-document")).toHaveText("Approve");
     await expect(page.locator("#confirm-document")).toBeEnabled();
     await expect(page.locator("#send-all")).toBeEnabled();
   } finally {

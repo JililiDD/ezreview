@@ -9,7 +9,7 @@ let dir: string;
 let handle: ReviewServerHandle;
 
 test.beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "ai-review-board-comment-rail-e2e-"));
+  dir = mkdtempSync(join(tmpdir(), "ezreview-comment-rail-e2e-"));
   const artifactPath = join(dir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "wide-content.html"), artifactPath);
   handle = await startReviewServer({ artifactPath, basePort: 6010 });
@@ -112,7 +112,7 @@ test("dragging the rail grip resizes the rail and repositions bubbles to match",
 });
 
 test("many queued comments overflow the rail's visible height and the rail scrolls to reach them", async ({ page }) => {
-  const manyDir = mkdtempSync(join(tmpdir(), "ai-review-board-comment-rail-many-e2e-"));
+  const manyDir = mkdtempSync(join(tmpdir(), "ezreview-comment-rail-many-e2e-"));
   const artifactPath = join(manyDir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "many-elements.html"), artifactPath);
   const manyHandle = await startReviewServer({ artifactPath, basePort: 6020 });

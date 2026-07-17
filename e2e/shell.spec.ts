@@ -9,7 +9,7 @@ let dir: string;
 let handle: ReviewServerHandle;
 
 test.beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "ai-review-board-e2e-"));
+  dir = mkdtempSync(join(tmpdir(), "ezreview-e2e-"));
   const artifactPath = join(dir, "demo.html");
   writeFileSync(artifactPath, "<html><body><h1>Demo artifact</h1></body></html>");
   handle = await startReviewServer({ artifactPath, basePort: 4700 });
@@ -36,7 +36,7 @@ test("shell page shows the dark toolbar and loads the artifact in the iframe", a
 });
 
 test("modifying the artifact reloads only the iframe, not the shell", async ({ page }) => {
-  const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-e2e-reload-"));
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-e2e-reload-"));
   const artifactPath = join(localDir, "demo.html");
   writeFileSync(artifactPath, "<html><body><h1>v0</h1></body></html>");
   const localHandle = await startReviewServer({ artifactPath, basePort: 4710 });
@@ -60,7 +60,7 @@ test("modifying the artifact reloads only the iframe, not the shell", async ({ p
 });
 
 test("connection status dot turns red when the SSE stream drops", async ({ page }) => {
-  const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-e2e-disconnect-"));
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-e2e-disconnect-"));
   const artifactPath = join(localDir, "demo.html");
   writeFileSync(artifactPath, "<html><body><h1>Demo</h1></body></html>");
   const localHandle = await startReviewServer({ artifactPath, basePort: 4720 });

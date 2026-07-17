@@ -29,7 +29,7 @@ describe("POST /reply", () => {
   let handle: ReviewServerHandle;
 
   before(async () => {
-    dir = mkdtempSync(join(tmpdir(), "ai-review-board-reply-endpoint-test-"));
+    dir = mkdtempSync(join(tmpdir(), "ezreview-reply-endpoint-test-"));
     artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
     handle = await startReviewServer({ artifactPath, basePort: 5900, sessionDir: join(dir, "session") });
@@ -97,7 +97,7 @@ describe("POST /reply", () => {
     // the same session dir, must still be recognized as a valid id — not
     // rejected as "unknown annotation id" just because the new process's
     // in-memory bookkeeping starts empty.
-    const restartDir = mkdtempSync(join(tmpdir(), "ai-review-board-reply-restart-test-"));
+    const restartDir = mkdtempSync(join(tmpdir(), "ezreview-reply-restart-test-"));
     const restartArtifact = join(restartDir, "demo.html");
     writeFileSync(restartArtifact, "<html></html>");
     const sessionDir = join(restartDir, "session");

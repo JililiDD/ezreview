@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>ai-review-board — agent usage guide</title>
+<title>ezreview — agent usage guide</title>
 </head>
 <body>
-  <h1>ai-review-board — agent usage guide</h1>
-  <p><code>ai-review-board</code> closes the loop between an agent that writes HTML artifacts and a human who
+  <h1>ezreview — agent usage guide</h1>
+  <p><code>ezreview</code> closes the loop between an agent that writes HTML artifacts and a human who
   reviews them in a browser. The human annotates the rendered artifact directly (clicking elements, selecting
   text); the agent reads those 测试这里 back as structured, Edit-ready text and either edits the file or
   answers a question.</p>
@@ -15,8 +15,8 @@
 
   <h2>The three commands</h2>
 
-  <h3><code>ai-review-board &lt;file.html&gt;</code> (no subcommand) — open a review session</h3>
-  <pre>ai-review-board report.html</pre>
+  <h3><code>ezreview &lt;file.html&gt;</code> (no subcommand) — open a review session</h3>
+  <pre>ezreview report.html</pre>
   <ul>
     <li><strong>It is a foreground process.</strong> It does not return until you kill it (Ctrl+C) or the
       server auto-exits after 1 hour with no client connected.</li>
@@ -27,8 +27,8 @@
       <code>Error: File not found: &lt;path&gt;</code> message on stderr and a non-zero exit.</li>
   </ul>
 
-  <h3><code>ai-review-board wait &lt;file.html&gt;</code> — block until the next batch of feedback</h3>
-  <pre>ai-review-board wait report.html</pre>
+  <h3><code>ezreview wait &lt;file.html&gt;</code> — block until the next batch of feedback</h3>
+  <pre>ezreview wait report.html</pre>
   <ul>
     <li>Blocks until the reviewer clicks "Send all" in the browser, then prints one batch of annotations as
       structured, readable text to stdout and exits 0.</li>
@@ -39,8 +39,8 @@
       the reviewer's <code>comment</code>.</li>
   </ul>
 
-  <h3><code>ai-review-board reply &lt;file.html&gt; --to &lt;id&gt; "&lt;answer text&gt;"</code> — answer a question</h3>
-  <pre>ai-review-board reply report.html --to a-3 "It's the API's required timezone format, not a bug."</pre>
+  <h3><code>ezreview reply &lt;file.html&gt; --to &lt;id&gt; "&lt;answer text&gt;"</code> — answer a question</h3>
+  <pre>ezreview reply report.html --to a-3 "It's the API's required timezone format, not a bug."</pre>
   <ul>
     <li>Use this for annotations that are <strong>questions</strong>, not change requests.</li>
     <li><strong>Always quote the answer text</strong> as a single shell argument.</li>

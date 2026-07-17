@@ -24,7 +24,7 @@ let artifactPath: string;
 let handle: ReviewServerHandle;
 
 test.beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "ai-review-board-text-sel-e2e-"));
+  dir = mkdtempSync(join(tmpdir(), "ezreview-text-sel-e2e-"));
   artifactPath = join(dir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "text-selection.html"), artifactPath);
   handle = await startReviewServer({ artifactPath, basePort: 5400 });
@@ -93,7 +93,7 @@ test("the draft bubble is positioned near the selection's bounding box", async (
 });
 
 test("a live-reload while a text-selection draft is open closes it and shows a reselect hint", async ({ page }) => {
-  const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-text-sel-reload-e2e-"));
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-sel-reload-e2e-"));
   const localArtifact = join(localDir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "text-selection.html"), localArtifact);
   const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5410 });

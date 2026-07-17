@@ -9,7 +9,7 @@ describe("feedback-queue", () => {
   let dir: string;
 
   before(() => {
-    dir = mkdtempSync(join(tmpdir(), "ai-review-board-feedback-queue-test-"));
+    dir = mkdtempSync(join(tmpdir(), "ezreview-feedback-queue-test-"));
   });
 
   after(() => {

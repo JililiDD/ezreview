@@ -36,7 +36,7 @@ describe("normalizeArtifactPath / sessionHash", () => {
 
 describe("sessionDirFor", () => {
   test("derives a directory under the given root keyed by hash", () => {
-    const root = join(tmpdir(), "ai-review-board-root-test");
+    const root = join(tmpdir(), "ezreview-root-test");
     const dir = sessionDirFor("demo.html", root);
     assert.equal(dir, join(root, sessionHash("demo.html")));
   });
@@ -46,7 +46,7 @@ describe("session.json read/write", () => {
   let root: string;
 
   before(() => {
-    root = mkdtempSync(join(tmpdir(), "ai-review-board-session-test-"));
+    root = mkdtempSync(join(tmpdir(), "ezreview-session-test-"));
   });
 
   after(() => {

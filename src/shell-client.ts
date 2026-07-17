@@ -23,7 +23,7 @@ export function renderClientScript(): string {
 
   // ---- Theme toggle (light/dark) ----
 
-  var THEME_STORAGE_KEY = "ai-review-board-theme";
+  var THEME_STORAGE_KEY = "ezreview-theme";
 
   function applyTheme(theme) {
     document.documentElement.setAttribute("data-theme", theme);
@@ -438,7 +438,7 @@ export function renderClientScript(): string {
   }
 
   function updateSendAllLabel() {
-    sendAllButton.textContent = "Send all (" + queue.length + ")";
+    sendAllButton.textContent = "Submit review (" + queue.length + ")";
   }
 
   function targetAnchorY(target) {
@@ -686,7 +686,7 @@ export function renderClientScript(): string {
     addBtn.textContent = "Add";
     // Same look as the toolbar's Send all button (var(--accent) fill).
     addBtn.style.background = "var(--accent)";
-    addBtn.style.color = "#fff";
+    addBtn.style.color = "var(--accent-ink)";
     addBtn.style.border = "none";
     addBtn.style.borderRadius = "6px";
     addBtn.style.padding = "6px 14px";
@@ -1156,7 +1156,7 @@ export function renderClientScript(): string {
     replyBtn.className = "followup-reply-btn";
     replyBtn.textContent = "Reply";
     replyBtn.style.background = "var(--accent)";
-    replyBtn.style.color = "#fff";
+    replyBtn.style.color = "var(--accent-ink)";
     replyBtn.style.border = "none";
     replyBtn.style.borderRadius = "6px";
     replyBtn.style.padding = "4px 12px";

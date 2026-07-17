@@ -9,8 +9,8 @@ import { waitForFeedback, renderBatch, WaitError, ReviewConfirmed } from "../src
 import { appendThreadMessage } from "../src/feedback-queue.js";
 
 async function setUp(basePort: number) {
-  const dir = mkdtempSync(join(tmpdir(), "ai-review-board-wait-test-"));
-  const sessionRoot = mkdtempSync(join(tmpdir(), "ai-review-board-wait-session-test-"));
+  const dir = mkdtempSync(join(tmpdir(), "ezreview-wait-test-"));
+  const sessionRoot = mkdtempSync(join(tmpdir(), "ezreview-wait-session-test-"));
   const artifactPath = join(dir, "demo.html");
   writeFileSync(artifactPath, "<html></html>");
   const sessionDir = sessionDirFor(artifactPath, sessionRoot);
@@ -27,7 +27,7 @@ async function tearDown(ctx: { dir: string; sessionRoot: string; handle: import(
 
 describe("renderBatch", () => {
   test("renders an element-annotation item with selector, outerHTML, and comment", () => {
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-renderbatch-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-renderbatch-test-"));
     const text = renderBatch(
       [{ id: "a-1", type: "element-annotation", selector: "#x", outerHTML: "<span>x</span>", comment: "too light" }],
       dir,
@@ -39,7 +39,7 @@ describe("renderBatch", () => {
   });
 
   test("renders a text-annotation item with selectedText and context", () => {
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-renderbatch-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-renderbatch-test-"));
     const text = renderBatch(
       [
         {
@@ -59,7 +59,7 @@ describe("renderBatch", () => {
   });
 
   test("renders a follow-up item (replyToId set) as its thread's full history, not just its own comment", () => {
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-renderbatch-followup-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-renderbatch-followup-test-"));
     appendThreadMessage(dir, "a-3", "human", "why is this here?");
     appendThreadMessage(dir, "a-3", "agent", "because the API requires it");
 
@@ -73,8 +73,8 @@ describe("renderBatch", () => {
 
 describe("waitForFeedback", () => {
   test("throws WaitError when there is no running session", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-wait-norun-test-"));
-    const sessionRoot = mkdtempSync(join(tmpdir(), "ai-review-board-wait-norun-session-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-wait-norun-test-"));
+    const sessionRoot = mkdtempSync(join(tmpdir(), "ezreview-wait-norun-session-"));
     const artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
     try {
@@ -149,8 +149,8 @@ describe("waitForFeedback", () => {
   });
 
   test("throws WaitError if the server closes the connection while wait is still pending", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-wait-close-test-"));
-    const sessionRoot = mkdtempSync(join(tmpdir(), "ai-review-board-wait-close-session-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-wait-close-test-"));
+    const sessionRoot = mkdtempSync(join(tmpdir(), "ezreview-wait-close-session-test-"));
     const artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
     const sessionDir = sessionDirFor(artifactPath, sessionRoot);
@@ -176,8 +176,8 @@ describe("waitForFeedback", () => {
     // same friendly WaitError, not an uncaught raw Node error (e.g.
     // "aborted"/ECONNRESET), which is exactly the class of bug this
     // work-item's fetch()-to-node:http switch exists to fix.
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-wait-abrupt-close-test-"));
-    const sessionRoot = mkdtempSync(join(tmpdir(), "ai-review-board-wait-abrupt-close-session-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-wait-abrupt-close-test-"));
+    const sessionRoot = mkdtempSync(join(tmpdir(), "ezreview-wait-abrupt-close-session-test-"));
     const artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
     const sessionDir = sessionDirFor(artifactPath, sessionRoot);

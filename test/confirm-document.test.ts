@@ -8,7 +8,7 @@ import { appendBatch } from "../src/feedback-queue.js";
 
 describe("POST /confirm-document", () => {
   test("deletes all persisted session files and shuts down the server", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-confirm-document-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-confirm-document-test-"));
     const artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
     const sessionDir = join(dir, "session");
@@ -36,7 +36,7 @@ describe("POST /confirm-document", () => {
   });
 
   test("broadcasts a confirmed SSE event to connected clients before shutting down", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-confirm-document-sse-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-confirm-document-sse-test-"));
     const artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
     const sessionDir = join(dir, "session");
@@ -66,7 +66,7 @@ describe("POST /confirm-document", () => {
   });
 
   test("does not error when persisted files never existed", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-confirm-document-empty-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-confirm-document-empty-test-"));
     const artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
     const sessionDir = join(dir, "session");

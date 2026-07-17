@@ -12,7 +12,7 @@ export async function sendReply(file: string, id: string, text: string, opts: Re
   const host = opts.host ?? DEFAULT_HOST;
   const sessionDir = sessionDirFor(file, opts.sessionRoot);
   const info = readSessionInfo(sessionDir);
-  const notRunningMessage = `No running review session for ${file}. Run "ai-review-board ${file}" first.`;
+  const notRunningMessage = `No running review session for ${file}. Run "ezreview ${file}" first.`;
   if (!info) {
     throw new ReplyError(notRunningMessage);
   }

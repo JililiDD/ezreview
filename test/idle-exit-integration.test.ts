@@ -7,7 +7,7 @@ import { startReviewServer } from "../src/server.js";
 
 describe("idle auto-exit end-to-end", () => {
   test("server closes itself after the idle window with no connected clients", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-idle-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-idle-test-"));
     const artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
 
@@ -23,7 +23,7 @@ describe("idle auto-exit end-to-end", () => {
   });
 
   test("server stays up while a client is connected past the idle window", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-idle-active-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-idle-active-test-"));
     const artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
 

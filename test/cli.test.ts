@@ -52,7 +52,7 @@ describe("validateArtifactFile", () => {
   let dir: string;
 
   before(() => {
-    dir = mkdtempSync(join(tmpdir(), "ai-review-board-cli-test-"));
+    dir = mkdtempSync(join(tmpdir(), "ezreview-cli-test-"));
   });
 
   after(() => {
@@ -101,8 +101,8 @@ describe("main", () => {
   });
 
   test("existing html file starts the server, prints the URL, and opens the browser", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-cli-main-test-"));
-    const sessionRoot = mkdtempSync(join(tmpdir(), "ai-review-board-cli-main-session-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-cli-main-test-"));
+    const sessionRoot = mkdtempSync(join(tmpdir(), "ezreview-cli-main-session-"));
     const file = join(dir, "demo.html");
     writeFileSync(file, "<html></html>");
 

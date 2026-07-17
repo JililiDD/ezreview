@@ -10,8 +10,8 @@ import { main } from "../src/cli.js";
 import type { ReviewServerHandle } from "../src/server.js";
 
 async function setUp(basePort: number) {
-  const dir = mkdtempSync(join(tmpdir(), "ai-review-board-reply-test-"));
-  const sessionRoot = mkdtempSync(join(tmpdir(), "ai-review-board-reply-session-test-"));
+  const dir = mkdtempSync(join(tmpdir(), "ezreview-reply-test-"));
+  const sessionRoot = mkdtempSync(join(tmpdir(), "ezreview-reply-session-test-"));
   const artifactPath = join(dir, "demo.html");
   writeFileSync(artifactPath, "<html></html>");
   const sessionDir = sessionDirFor(artifactPath, sessionRoot);
@@ -28,8 +28,8 @@ async function tearDown(ctx: { dir: string; sessionRoot: string; handle: ReviewS
 
 describe("sendReply", () => {
   test("throws ReplyError when there is no running session", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-reply-norun-test-"));
-    const sessionRoot = mkdtempSync(join(tmpdir(), "ai-review-board-reply-norun-session-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-reply-norun-test-"));
+    const sessionRoot = mkdtempSync(join(tmpdir(), "ezreview-reply-norun-session-"));
     const artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
     try {
@@ -84,7 +84,7 @@ describe("sendReply", () => {
 
 describe("cli reply subcommand exit codes", () => {
   test("no running session -> non-zero exit", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-cli-reply-norun-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-cli-reply-norun-"));
     const artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
     try {

@@ -12,8 +12,8 @@ describe("openIdempotently", () => {
   let artifactPath: string;
 
   before(() => {
-    dir = mkdtempSync(join(tmpdir(), "ai-review-board-idempotent-test-"));
-    sessionRoot = mkdtempSync(join(tmpdir(), "ai-review-board-idempotent-session-"));
+    dir = mkdtempSync(join(tmpdir(), "ezreview-idempotent-test-"));
+    sessionRoot = mkdtempSync(join(tmpdir(), "ezreview-idempotent-session-"));
     artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
   });

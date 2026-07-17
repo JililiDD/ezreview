@@ -6,7 +6,7 @@ import { startReviewServer } from "../src/server.ts";
 import type { ReviewServerHandle } from "../src/server.ts";
 
 async function startWithFixture(fixtureName: string, basePort: number) {
-  const dir = mkdtempSync(join(tmpdir(), "ai-review-board-bubble-collapse-e2e-"));
+  const dir = mkdtempSync(join(tmpdir(), "ezreview-bubble-collapse-e2e-"));
   const artifactPath = join(dir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", fixtureName), artifactPath);
   const handle = await startReviewServer({ artifactPath, basePort });

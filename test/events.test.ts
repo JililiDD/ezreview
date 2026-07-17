@@ -37,7 +37,7 @@ describe("/events SSE endpoint", () => {
   let handle: ReviewServerHandle;
 
   before(async () => {
-    dir = mkdtempSync(join(tmpdir(), "ai-review-board-events-test-"));
+    dir = mkdtempSync(join(tmpdir(), "ezreview-events-test-"));
     artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
     handle = await startReviewServer({ artifactPath, basePort: 4900 });
@@ -89,7 +89,7 @@ describe("/events SSE endpoint", () => {
 
 describe("close() with a live, non-aborted SSE client", () => {
   test("resolves promptly instead of hanging on the open keep-alive connection", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-events-close-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-events-close-test-"));
     const artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
     const handle = await startReviewServer({ artifactPath, basePort: 4910 });

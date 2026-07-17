@@ -53,7 +53,7 @@ let artifactPath: string;
 let handle: ReviewServerHandle;
 
 test.beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "ai-review-board-text-queue-e2e-"));
+  dir = mkdtempSync(join(tmpdir(), "ezreview-text-queue-e2e-"));
   artifactPath = join(dir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "text-selection.html"), artifactPath);
   handle = await startReviewServer({ artifactPath, basePort: 5500 });
@@ -168,7 +168,7 @@ test("hovering a queued (not-lost) text annotation deepens its highlight and rev
 });
 
 test("a text annotation queued before a reload is marked lost after the reload", async ({ page }) => {
-  const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-text-queue-reload-e2e-"));
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-queue-reload-e2e-"));
   const localArtifact = join(localDir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "text-selection.html"), localArtifact);
   const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5510 });
@@ -197,7 +197,7 @@ test("a text annotation that was already Sent before a reload is also marked los
   // iframe document, so hovering it neither highlighted anything (the
   // Range's nodes are gone) nor showed the Anchor lost badge — a silent,
   // confusing dead end a real reviewer hit manually.
-  const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-text-sent-reload-e2e-"));
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-sent-reload-e2e-"));
   const localArtifact = join(localDir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "text-selection.html"), localArtifact);
   const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5520 });
@@ -223,7 +223,7 @@ test("a text annotation that was already Sent before a reload is also marked los
 });
 
 test("a text annotation survives a reload that only edited an unrelated part of the page", async ({ page }) => {
-  const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-text-reanchor-unrelated-e2e-"));
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-reanchor-unrelated-e2e-"));
   const localArtifact = join(localDir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "text-selection.html"), localArtifact);
   const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5530 });
@@ -251,7 +251,7 @@ test("a text annotation survives a reload that only edited an unrelated part of 
 });
 
 test("a text annotation whose selected text was itself edited re-anchors to the replacement text", async ({ page }) => {
-  const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-text-reanchor-replaced-e2e-"));
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-reanchor-replaced-e2e-"));
   const localArtifact = join(localDir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "text-selection.html"), localArtifact);
   const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5540 });
@@ -284,7 +284,7 @@ test("a text annotation whose selected text was itself edited re-anchors to the 
 });
 
 test("a text annotation stays lost when its context landmarks are now ambiguous (found more than once)", async ({ page }) => {
-  const localDir = mkdtempSync(join(tmpdir(), "ai-review-board-text-reanchor-ambiguous-e2e-"));
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-reanchor-ambiguous-e2e-"));
   const localArtifact = join(localDir, "demo.html");
   // A paragraph long enough (>200 chars) that getTextContext's ancestor
   // climb stops at #para itself, so before/after are plain sentence text —

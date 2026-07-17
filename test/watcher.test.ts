@@ -10,7 +10,7 @@ describe("watchArtifactFile", () => {
   let filePath: string;
 
   before(() => {
-    dir = mkdtempSync(join(tmpdir(), "ai-review-board-watcher-test-"));
+    dir = mkdtempSync(join(tmpdir(), "ezreview-watcher-test-"));
     filePath = join(dir, "demo.html");
     writeFileSync(filePath, "<html>v0</html>");
   });

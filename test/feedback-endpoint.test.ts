@@ -14,7 +14,7 @@ describe("POST /feedback", () => {
   let handle: ReviewServerHandle;
 
   before(async () => {
-    dir = mkdtempSync(join(tmpdir(), "ai-review-board-feedback-endpoint-test-"));
+    dir = mkdtempSync(join(tmpdir(), "ezreview-feedback-endpoint-test-"));
     sessionDir = join(dir, "session");
     artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
@@ -129,8 +129,8 @@ describe("POST /feedback", () => {
 describe("sessionDir wiring through idempotent-open", () => {
   test("the review server's session dir is the same one openIdempotently computed", async () => {
     const { openIdempotently } = await import("../src/idempotent-open.js");
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-feedback-sessiondir-test-"));
-    const sessionRoot = mkdtempSync(join(tmpdir(), "ai-review-board-feedback-sessionroot-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-feedback-sessiondir-test-"));
+    const sessionRoot = mkdtempSync(join(tmpdir(), "ezreview-feedback-sessionroot-test-"));
     const artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
 

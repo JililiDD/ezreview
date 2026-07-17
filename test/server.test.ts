@@ -13,7 +13,7 @@ describe("startReviewServer", () => {
   let handle: ReviewServerHandle;
 
   before(async () => {
-    dir = mkdtempSync(join(tmpdir(), "ai-review-board-server-test-"));
+    dir = mkdtempSync(join(tmpdir(), "ezreview-server-test-"));
     artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html><body>hello artifact</body></html>");
     handle = await startReviewServer({ artifactPath, basePort: 4500 });
@@ -59,7 +59,7 @@ describe("startReviewServer", () => {
 
 describe("port probing", () => {
   test("advances to the next port when the base port is occupied", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-server-port-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-server-port-test-"));
     const artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
 

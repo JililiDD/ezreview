@@ -32,7 +32,7 @@ describe("cli.js as a real child process (not an in-process main() call)", () =>
     // crash with a libuv assertion ("UV_HANDLE_CLOSING") instead of exiting
     // cleanly. In-process main() calls (as in cli.test.ts) can't catch this
     // — it only manifests when the actual OS process exits.
-    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-cli-process-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-cli-process-test-"));
     const artifactPath = join(dir, "demo.html");
     writeFileSync(artifactPath, "<html></html>");
     // The real cli.js entry has no session-root override (that's an
