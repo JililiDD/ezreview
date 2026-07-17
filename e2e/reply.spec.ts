@@ -53,9 +53,13 @@ test("an agent reply renders inside the same bubble with an AGENT label, and a f
     // DAC-3: no terminal "✓ Answered" badge — threads have no terminal state.
     await expect(bubble.locator(".answered-badge")).toHaveCount(0);
 
-    // DAC-1: the follow-up input is persistent (no click-to-expand needed),
-    // and a second reply to the same id still succeeds (no answered-once cap).
+    // The follow-up input is collapsed behind a "Reply" button by default;
+    // clicking it reveals the textarea/Add controls.
+    await expect(bubble.locator(".followup-reply-btn")).toBeVisible();
+    await bubble.locator(".followup-reply-btn").click();
     await expect(bubble.locator(".followup-controls textarea")).toBeVisible();
+
+    // a second reply to the same id still succeeds (no answered-once cap).
 
     const secondRes = await fetch(new URL("/reply", handle.url), {
       method: "POST",
@@ -76,6 +80,7 @@ test("submitting a follow-up via the persistent input queues it and threads it a
     await queueAndSend(page, "why is this here?");
 
     const bubble = page.locator(".bubble");
+    await bubble.locator(".followup-reply-btn").click();
     await bubble.locator(".followup-controls textarea").fill("still unclear, can you say more?");
     await bubble.locator(".followup-controls .bubble-add").click();
 

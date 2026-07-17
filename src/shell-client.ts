@@ -1059,35 +1059,58 @@ export function renderClientScript(): string {
   // Follow-up input is persistent, not click-to-expand (DAC-1) — reuses
   // buildDraftControls' textarea/Add/× visual language, but submitting it
   // queues a { replyToId } item instead of opening a fresh draft bubble.
+  // Collapsed behind a "Reply" button by default — only expanding into the
+  // textarea once clicked, not shown open-ended on every sent bubble.
   function addFollowUpControls(node, rootId) {
-    if (node.querySelector(".followup-controls")) return;
-    var wrap = document.createElement("div");
-    wrap.className = "followup-controls";
-    wrap.style.position = "relative";
-    wrap.style.marginTop = "8px";
+    if (node.querySelector(".followup-controls") || node.querySelector(".followup-reply-btn")) return;
 
-    var controls = buildDraftControls(wrap);
-    // buildDraftControls wires its own close/add buttons assuming a
-    // floating draft bubble — a follow-up box lives inline in a sent
-    // bubble, so those default bindings are replaced below.
-    var closeBtn = wrap.querySelector(".bubble-cancel");
-    var addBtn = wrap.querySelector(".bubble-add");
-    var newCloseBtn = closeBtn.cloneNode(true);
-    closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
-    var newAddBtn = addBtn.cloneNode(true);
-    addBtn.parentNode.replaceChild(newAddBtn, addBtn);
+    var replyBtn = document.createElement("button");
+    replyBtn.className = "followup-reply-btn";
+    replyBtn.textContent = "Reply";
+    replyBtn.style.marginTop = "8px";
+    replyBtn.style.background = "transparent";
+    replyBtn.style.border = "1px solid #e3e5e9";
+    replyBtn.style.borderRadius = "6px";
+    replyBtn.style.padding = "4px 10px";
+    replyBtn.style.fontSize = "12px";
+    replyBtn.style.color = "var(--chrome-dim)";
+    replyBtn.style.cursor = "pointer";
+    node.appendChild(replyBtn);
 
-    newCloseBtn.addEventListener("click", function () {
-      controls.textarea.value = "";
+    replyBtn.addEventListener("click", function () {
+      replyBtn.remove();
+
+      var wrap = document.createElement("div");
+      wrap.className = "followup-controls";
+      wrap.style.position = "relative";
+      wrap.style.marginTop = "8px";
+
+      var controls = buildDraftControls(wrap);
+      // buildDraftControls wires its own close/add buttons assuming a
+      // floating draft bubble — a follow-up box lives inline in a sent
+      // bubble, so those default bindings are replaced below.
+      var closeBtn = wrap.querySelector(".bubble-cancel");
+      var addBtn = wrap.querySelector(".bubble-add");
+      var newCloseBtn = closeBtn.cloneNode(true);
+      closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+      var newAddBtn = addBtn.cloneNode(true);
+      addBtn.parentNode.replaceChild(newAddBtn, addBtn);
+
+      newCloseBtn.addEventListener("click", function () {
+        wrap.remove();
+        addFollowUpControls(node, rootId);
+      });
+      newAddBtn.addEventListener("click", function () {
+        var text = controls.textarea.value;
+        if (!text) return;
+        queueFollowUp(rootId, text, node);
+        wrap.remove();
+        addFollowUpControls(node, rootId);
+      });
+
+      node.appendChild(wrap);
+      controls.textarea.focus();
     });
-    newAddBtn.addEventListener("click", function () {
-      var text = controls.textarea.value;
-      if (!text) return;
-      queueFollowUp(rootId, text, node);
-      controls.textarea.value = "";
-    });
-
-    node.appendChild(wrap);
   }
 
   function queueFollowUp(rootId, text, node) {

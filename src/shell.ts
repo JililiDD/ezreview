@@ -113,16 +113,13 @@ export function renderShellPage(): string {
     flex: 1;
   }
   #confirm-document {
-    background: transparent;
-    color: var(--chrome-dim);
+    background: var(--accent);
+    color: #fff;
     border: none;
     border-radius: 6px;
     padding: 6px 12px;
     font-size: 12.5px;
     cursor: pointer;
-  }
-  #confirm-document:hover {
-    color: var(--disconnect-red);
   }
   #send-all {
     background: var(--accent);
@@ -205,7 +202,9 @@ export function renderShellPage(): string {
     border-top: 1px solid #e3e5e9;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+  }
+  #rail-footer #send-all {
+    width: 100%;
   }
   .bubble-thread {
     max-height: 300px;
