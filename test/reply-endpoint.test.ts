@@ -64,14 +64,14 @@ describe("POST /reply", () => {
     controller.abort();
   });
 
-  test("replying to the same id twice is rejected with 409", async () => {
+  test("replying to the same id twice both succeed — multi-round threads have no answered-once cap", async () => {
     await postFeedback(handle, [{ id: "a-2", comment: "second question" }]);
 
     const first = await postReply(handle, "a-2", "first answer");
     assert.equal(first.status, 200);
 
-    const second = await postReply(handle, "a-2", "second answer attempt");
-    assert.equal(second.status, 409);
+    const second = await postReply(handle, "a-2", "second answer, still the same thread");
+    assert.equal(second.status, 200);
   });
 
   test("replying to an id that was never submitted is rejected with 400", async () => {

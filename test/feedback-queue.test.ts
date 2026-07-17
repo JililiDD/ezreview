@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { appendBatch, consumeNextBatch, loadSubmittedIds, loadAnsweredIds, recordAnsweredId } from "../src/feedback-queue.js";
+import { appendBatch, consumeNextBatch, loadSubmittedIds, appendThreadMessage, loadThreadHistory } from "../src/feedback-queue.js";
 
 describe("feedback-queue", () => {
   let dir: string;
@@ -61,15 +61,54 @@ describe("feedback-queue", () => {
     assert.deepEqual(loadSubmittedIds(sessionDir), new Set(["a-1", "a-2"])); // ...but still recorded as submitted
   });
 
-  test("loadSubmittedIds/loadAnsweredIds return an empty set when no file exists yet", () => {
+  test("loadSubmittedIds returns an empty set when no file exists yet", () => {
     const sessionDir = join(dir, "no-ids-file-yet");
     assert.deepEqual(loadSubmittedIds(sessionDir), new Set());
-    assert.deepEqual(loadAnsweredIds(sessionDir), new Set());
   });
 
-  test("recordAnsweredId persists across separate loads (simulating a server restart)", () => {
-    const sessionDir = join(dir, "answered-durability");
-    recordAnsweredId(sessionDir, "a-1");
-    assert.deepEqual(loadAnsweredIds(sessionDir), new Set(["a-1"]));
+  test("appendBatch records the original comment as the first human message in that id's thread", () => {
+    const sessionDir = join(dir, "thread-seed");
+    appendBatch(sessionDir, [{ id: "a-1", comment: "why is this here?" }]);
+
+    const history = loadThreadHistory(sessionDir, "a-1");
+    assert.equal(history.length, 1);
+    assert.equal(history[0].from, "human");
+    assert.equal(history[0].text, "why is this here?");
+  });
+
+  test("appendBatch files a follow-up (replyToId set) under the root thread, not its own id", () => {
+    const sessionDir = join(dir, "thread-followup");
+    appendBatch(sessionDir, [{ id: "a-1", comment: "why is this here?" }]);
+    appendBatch(sessionDir, [{ id: "a-2", replyToId: "a-1", comment: "still unclear, can you say more?" }]);
+
+    const history = loadThreadHistory(sessionDir, "a-1");
+    assert.equal(history.length, 2);
+    assert.equal(history[1].text, "still unclear, can you say more?");
+    // The follow-up's own id never becomes a thread of its own.
+    assert.deepEqual(loadThreadHistory(sessionDir, "a-2"), []);
+  });
+
+  test("appendThreadMessage persists agent replies durably, and loadThreadHistory returns them in chronological order", () => {
+    const sessionDir = join(dir, "thread-agent-replies");
+    appendBatch(sessionDir, [{ id: "a-1", comment: "why is this here?" }]);
+    appendThreadMessage(sessionDir, "a-1", "agent", "because the API requires it");
+    appendBatch(sessionDir, [{ id: "a-2", replyToId: "a-1", comment: "but why does the API require it?" }]);
+    appendThreadMessage(sessionDir, "a-1", "agent", "it's part of the ISO 8601 spec");
+
+    const history = loadThreadHistory(sessionDir, "a-1");
+    assert.deepEqual(
+      history.map((m) => [m.from, m.text]),
+      [
+        ["human", "why is this here?"],
+        ["agent", "because the API requires it"],
+        ["human", "but why does the API require it?"],
+        ["agent", "it's part of the ISO 8601 spec"],
+      ],
+    );
+  });
+
+  test("loadThreadHistory returns an empty array for a thread with no messages", () => {
+    const sessionDir = join(dir, "thread-empty");
+    assert.deepEqual(loadThreadHistory(sessionDir, "never-existed"), []);
   });
 });

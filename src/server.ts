@@ -5,7 +5,7 @@ import { renderShellPage } from "./shell.js";
 import { SseHub } from "./sse.js";
 import { watchArtifactFile } from "./watcher.js";
 import { watchForIdle, DEFAULT_IDLE_TIMEOUT_MS } from "./idle-exit.js";
-import { appendBatch, loadSubmittedIds, loadAnsweredIds, recordAnsweredId } from "./feedback-queue.js";
+import { appendBatch, loadSubmittedIds, appendThreadMessage, resetSessionFiles } from "./feedback-queue.js";
 import { sessionDirFor } from "./session.js";
 
 export const DEFAULT_HOST = "127.0.0.1";
@@ -45,13 +45,17 @@ function readJsonBody(req: IncomingMessage): Promise<unknown> {
   });
 }
 
-export function createRequestHandler(artifactPath: string, sseHub: SseHub, sessionDir: string) {
+export function createRequestHandler(
+  artifactPath: string,
+  sseHub: SseHub,
+  sessionDir: string,
+  onConfirmDocument: () => void,
+) {
   const absoluteArtifactPath = resolve(artifactPath);
   // Seeded from disk (not empty) so ids submitted in a prior server process —
   // including ones already consumed by `wait` before this process started —
   // remain valid to reply to across an idle-exit restart.
   const submittedIds = loadSubmittedIds(sessionDir);
-  const answeredIds = loadAnsweredIds(sessionDir);
 
   return function handler(req: IncomingMessage, res: ServerResponse): void {
     const pathname = (req.url ?? "/").split("?")[0];
@@ -108,6 +112,14 @@ export function createRequestHandler(artifactPath: string, sseHub: SseHub, sessi
             res.end(JSON.stringify({ error: "expected an array of annotation items, each with an id" }));
             return;
           }
+          const unknownReplyTo = (body as Array<{ replyToId?: unknown }>).find(
+            (item) => item.replyToId != null && !submittedIds.has(String(item.replyToId)),
+          );
+          if (unknownReplyTo) {
+            res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ error: `unknown annotation id: ${String(unknownReplyTo.replyToId)}` }));
+            return;
+          }
           appendBatch(sessionDir, body as unknown[]);
           for (const item of body as Array<{ id: unknown }>) {
             submittedIds.add(String(item.id));
@@ -142,13 +154,10 @@ export function createRequestHandler(artifactPath: string, sseHub: SseHub, sessi
             res.end(JSON.stringify({ error: `unknown annotation id: ${id}` }));
             return;
           }
-          if (answeredIds.has(id)) {
-            res.writeHead(409, { "Content-Type": "application/json; charset=utf-8" });
-            res.end(JSON.stringify({ error: `annotation ${id} has already been answered` }));
-            return;
-          }
-          answeredIds.add(id);
-          recordAnsweredId(sessionDir, id);
+          // No "already answered" cap — id is always a thread root id, and a
+          // thread can receive any number of agent replies across its
+          // lifetime (multi-round Q&A, not one-shot).
+          appendThreadMessage(sessionDir, id, "agent", text);
           sseHub.broadcast("reply", { id, text });
           res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
           res.end(JSON.stringify({ ok: true }));
@@ -157,6 +166,14 @@ export function createRequestHandler(artifactPath: string, sseHub: SseHub, sessi
           res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
           res.end(JSON.stringify({ error: "invalid JSON body" }));
         });
+      return;
+    }
+
+    if (pathname === "/confirm-document" && req.method === "POST") {
+      resetSessionFiles(sessionDir);
+      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: true }));
+      onConfirmDocument();
       return;
     }
 
@@ -223,7 +240,9 @@ export async function startReviewServer(options: ReviewServerOptions): Promise<R
   const basePort = options.basePort ?? BASE_PORT;
   const sessionDir = options.sessionDir ?? sessionDirFor(options.artifactPath);
   const sseHub = new SseHub();
-  const handler = createRequestHandler(options.artifactPath, sseHub, sessionDir);
+  const handler = createRequestHandler(options.artifactPath, sseHub, sessionDir, () => {
+    close().catch(() => {});
+  });
   const server = createHttpServer(handler);
   const port = await listenOnAvailablePort(server, host, basePort);
 

@@ -112,6 +112,18 @@ export function renderShellPage(): string {
   #spacer-2 {
     flex: 1;
   }
+  #confirm-document {
+    background: transparent;
+    color: var(--chrome-dim);
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  #confirm-document:hover {
+    color: var(--disconnect-red);
+  }
   #send-all {
     background: var(--accent);
     color: #fff;
@@ -157,7 +169,10 @@ export function renderShellPage(): string {
   }
   #rail-scroll {
     position: absolute;
-    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 48px;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 40px 12px 12px;
@@ -178,6 +193,24 @@ export function renderShellPage(): string {
     cursor: pointer;
     z-index: 950;
   }
+  #rail-footer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 48px;
+    box-sizing: border-box;
+    padding: 8px 12px;
+    background: #fff;
+    border-top: 1px solid #e3e5e9;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+  .bubble-thread {
+    max-height: 300px;
+    overflow-y: auto;
+  }
 </style>
 </head>
 <body>
@@ -194,7 +227,7 @@ export function renderShellPage(): string {
     </div>
     <span id="scroll-hint">Scroll while hovering to widen the selection</span>
     <div id="spacer-2"></div>
-    <button id="send-all">Send all (0)</button>
+    <button id="confirm-document">Confirm document</button>
   </div>
   <div id="stage">
     <div id="artifact-pane">
@@ -204,6 +237,9 @@ export function renderShellPage(): string {
     <div id="comment-rail">
       <button id="rail-collapse" title="Collapse comments">‹</button>
       <div id="rail-scroll"></div>
+      <div id="rail-footer">
+        <button id="send-all">Send all (0)</button>
+      </div>
     </div>
   </div>
   <script>${renderClientScript()}</script>

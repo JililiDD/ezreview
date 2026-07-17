@@ -10,6 +10,8 @@ export function renderClientScript(): string {
   var railScroll = document.getElementById("rail-scroll");
   var railGrip = document.getElementById("rail-grip");
   var railCollapseBtn = document.getElementById("rail-collapse");
+  var railFooter = document.getElementById("rail-footer");
+  var confirmDocumentButton = document.getElementById("confirm-document");
 
   function setConnected() {
     dot.classList.remove("disconnected");
@@ -43,7 +45,7 @@ export function renderClientScript(): string {
   source.addEventListener("reply", function (e) {
     var data = JSON.parse(e.data);
     var node = findAnnotationNodeById(data.id);
-    if (!node || node.querySelector(".answer-block")) return;
+    if (!node) return;
     renderAnswer(node, data.text);
   });
 
@@ -288,6 +290,7 @@ export function renderClientScript(): string {
     commentRail.classList.toggle("collapsed", railCollapsed);
     railCollapseBtn.textContent = railCollapsed ? "›" : "‹";
     railScroll.style.display = railCollapsed ? "none" : "block";
+    railFooter.style.display = railCollapsed ? "none" : "flex";
     renderHistoryGroup();
   }
 
@@ -441,7 +444,21 @@ export function renderClientScript(): string {
     return null;
   }
 
-  function renderAnswer(node, text) {
+  // The thread container is a single capped-height, internally scrolling box
+  // (DAC-2) — a thread has no message-count limit, so left ungrown it would
+  // push every other bubble in the rail out of reach.
+  function getOrCreateThreadContainer(node) {
+    var container = node.querySelector(".bubble-thread");
+    if (!container) {
+      container = document.createElement("div");
+      container.className = "bubble-thread";
+      node.appendChild(container);
+    }
+    return container;
+  }
+
+  function appendAnswerToThread(node, text) {
+    var container = getOrCreateThreadContainer(node);
     var answerBlock = document.createElement("div");
     answerBlock.className = "answer-block";
     answerBlock.style.marginTop = "6px";
@@ -462,19 +479,25 @@ export function renderClientScript(): string {
     answerText.textContent = text;
     answerBlock.appendChild(answerText);
 
-    node.appendChild(answerBlock);
+    container.appendChild(answerBlock);
+    container.scrollTop = container.scrollHeight;
+  }
 
-    var answeredBadge = document.createElement("span");
-    answeredBadge.className = "answered-badge";
-    answeredBadge.textContent = "✓ Answered";
-    answeredBadge.style.display = "inline-block";
-    answeredBadge.style.marginTop = "4px";
-    answeredBadge.style.padding = "1px 6px";
-    answeredBadge.style.borderRadius = "4px";
-    answeredBadge.style.fontSize = "11px";
-    answeredBadge.style.color = "#1d7a45";
-    answeredBadge.style.background = "#e2f5ea";
-    node.appendChild(answeredBadge);
+  // Kept as the public name used by the /events "reply" handler below —
+  // multi-round threads have no "first answer only" special case anymore,
+  // every reply (first or Nth) appends the same way.
+  function renderAnswer(node, text) {
+    appendAnswerToThread(node, text);
+  }
+
+  function appendFollowUpToThread(node, text) {
+    var container = getOrCreateThreadContainer(node);
+    var followUp = document.createElement("div");
+    followUp.className = "bubble-comment";
+    followUp.style.marginTop = "6px";
+    followUp.textContent = text;
+    container.appendChild(followUp);
+    container.scrollTop = container.scrollHeight;
   }
 
   function setAnchorLost(node, lost) {
@@ -1003,6 +1026,13 @@ export function renderClientScript(): string {
 
   function buildSubmissionPayload() {
     return queue.map(function (item) {
+      if (item.type === "follow-up") {
+        return {
+          id: item.id,
+          replyToId: item.replyToId,
+          comment: item.comment,
+        };
+      }
       if (item.type === "text-annotation") {
         return {
           id: item.id,
@@ -1026,6 +1056,54 @@ export function renderClientScript(): string {
     });
   }
 
+  // Follow-up input is persistent, not click-to-expand (DAC-1) — reuses
+  // buildDraftControls' textarea/Add/× visual language, but submitting it
+  // queues a { replyToId } item instead of opening a fresh draft bubble.
+  function addFollowUpControls(node, rootId) {
+    if (node.querySelector(".followup-controls")) return;
+    var wrap = document.createElement("div");
+    wrap.className = "followup-controls";
+    wrap.style.position = "relative";
+    wrap.style.marginTop = "8px";
+
+    var controls = buildDraftControls(wrap);
+    // buildDraftControls wires its own close/add buttons assuming a
+    // floating draft bubble — a follow-up box lives inline in a sent
+    // bubble, so those default bindings are replaced below.
+    var closeBtn = wrap.querySelector(".bubble-cancel");
+    var addBtn = wrap.querySelector(".bubble-add");
+    var newCloseBtn = closeBtn.cloneNode(true);
+    closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+    var newAddBtn = addBtn.cloneNode(true);
+    addBtn.parentNode.replaceChild(newAddBtn, addBtn);
+
+    newCloseBtn.addEventListener("click", function () {
+      controls.textarea.value = "";
+    });
+    newAddBtn.addEventListener("click", function () {
+      var text = controls.textarea.value;
+      if (!text) return;
+      queueFollowUp(rootId, text, node);
+      controls.textarea.value = "";
+    });
+
+    node.appendChild(wrap);
+  }
+
+  function queueFollowUp(rootId, text, node) {
+    var id = "a-" + nextQueueId++;
+    var item = {
+      id: id,
+      node: null,
+      type: "follow-up",
+      replyToId: rootId,
+      comment: text,
+    };
+    queue.push(item);
+    appendFollowUpToThread(node, text);
+    updateSendAllLabel();
+  }
+
   function markBubbleSent(node) {
     var deleteBtn = node.querySelector(".bubble-delete");
     if (deleteBtn) deleteBtn.remove();
@@ -1039,6 +1117,7 @@ export function renderClientScript(): string {
     badge.style.fontSize = "11px";
     badge.style.color = "#555";
     node.appendChild(badge);
+    addFollowUpControls(node, node.getAttribute("data-annotation-id"));
   }
 
   function showSendFailure(message) {
@@ -1063,6 +1142,11 @@ export function renderClientScript(): string {
           return;
         }
         for (var i = 0; i < queue.length; i++) {
+          // Follow-up items have no bubble of their own (queueFollowUp
+          // already rendered the message inline into the root bubble's
+          // thread) — only new-annotation items go through the normal
+          // sent/history bubble lifecycle.
+          if (queue[i].type === "follow-up") continue;
           markBubbleSent(queue[i].node);
           sentItems.push(queue[i]);
         }
@@ -1073,6 +1157,17 @@ export function renderClientScript(): string {
       .catch(function () {
         showSendFailure("Send failed — network error");
       });
+  });
+
+  confirmDocumentButton.addEventListener("click", function () {
+    if (queue.length > 0) {
+      showSendFailure("Send or clear the queue first");
+      return;
+    }
+    if (!window.confirm("Confirm this document is done? All feedback history will be deleted.")) {
+      return;
+    }
+    fetch("/confirm-document", { method: "POST" }).catch(function () {});
   });
 
   function onIframeClick(e) {

@@ -54,7 +54,7 @@ describe("sendReply", () => {
     }
   });
 
-  test("throws ReplyError with the server's message for a duplicate reply (409)", async () => {
+  test("a second reply to the same id also succeeds — multi-round threads have no answered-once cap", async () => {
     const ctx = await setUp(6110);
     try {
       await fetch(new URL("/feedback", ctx.handle.url), {
@@ -62,8 +62,8 @@ describe("sendReply", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify([{ id: "a-2", comment: "question" }]),
       });
-      await sendReply(ctx.artifactPath, "a-2", "first", { sessionRoot: ctx.sessionRoot });
-      await assert.rejects(() => sendReply(ctx.artifactPath, "a-2", "second", { sessionRoot: ctx.sessionRoot }), ReplyError);
+      await assert.doesNotReject(() => sendReply(ctx.artifactPath, "a-2", "first", { sessionRoot: ctx.sessionRoot }));
+      await assert.doesNotReject(() => sendReply(ctx.artifactPath, "a-2", "second", { sessionRoot: ctx.sessionRoot }));
     } finally {
       await tearDown(ctx);
     }

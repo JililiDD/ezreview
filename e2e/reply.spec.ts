@@ -27,7 +27,7 @@ async function queueAndSend(page: import("@playwright/test").Page, comment: stri
   await expect(page.locator(".bubble-sent")).toBeVisible();
 }
 
-test("an agent reply renders inside the same bubble with AGENT label and Answered badge, no follow-up input", async ({
+test("an agent reply renders inside the same bubble with an AGENT label, and a follow-up input stays available", async ({
   page,
 }) => {
   const { dir, handle } = await startWithFixture("bubble-queue.html", 6200);
@@ -49,10 +49,43 @@ test("an agent reply renders inside the same bubble with AGENT label and Answere
     const bubble = page.locator(".bubble");
     await expect(bubble.locator(".answer-block .agent-label")).toHaveText("AGENT");
     await expect(bubble.locator(".answer-block .answer-text")).toHaveText("because the API requires it");
-    await expect(bubble.locator(".answered-badge")).toHaveText("✓ Answered");
 
-    // DAC-8: no follow-up input control anywhere inside the bubble
-    await expect(bubble.locator("input, textarea")).toHaveCount(0);
+    // DAC-3: no terminal "✓ Answered" badge — threads have no terminal state.
+    await expect(bubble.locator(".answered-badge")).toHaveCount(0);
+
+    // DAC-1: the follow-up input is persistent (no click-to-expand needed),
+    // and a second reply to the same id still succeeds (no answered-once cap).
+    await expect(bubble.locator(".followup-controls textarea")).toBeVisible();
+
+    const secondRes = await fetch(new URL("/reply", handle.url), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, text: "it's part of the ISO 8601 spec" }),
+    });
+    expect(secondRes.status).toBe(200);
+    await expect(bubble.locator(".answer-block")).toHaveCount(2);
+  } finally {
+    await cleanup(dir, handle);
+  }
+});
+
+test("submitting a follow-up via the persistent input queues it and threads it after Send all", async ({ page }) => {
+  const { dir, handle } = await startWithFixture("bubble-queue.html", 6205);
+  try {
+    await page.goto(handle.url);
+    await queueAndSend(page, "why is this here?");
+
+    const bubble = page.locator(".bubble");
+    await bubble.locator(".followup-controls textarea").fill("still unclear, can you say more?");
+    await bubble.locator(".followup-controls .bubble-add").click();
+
+    // The follow-up renders immediately inside the thread, and Send all's
+    // counter reflects it as a queued item awaiting submission.
+    await expect(bubble.locator(".bubble-thread .bubble-comment")).toHaveText("still unclear, can you say more?");
+    await expect(page.locator("#send-all")).toHaveText("Send all (1)");
+
+    await page.locator("#send-all").click();
+    await expect(page.locator("#send-all")).toHaveText("Send all (0)");
   } finally {
     await cleanup(dir, handle);
   }

@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startReviewServer } from "../src/server.js";
-import { consumeNextBatch } from "../src/feedback-queue.js";
+import { consumeNextBatch, loadThreadHistory } from "../src/feedback-queue.js";
 import type { ReviewServerHandle } from "../src/server.js";
 
 describe("POST /feedback", () => {
@@ -89,6 +89,40 @@ describe("POST /feedback", () => {
       body: "{not valid json",
     });
     assert.equal(res.status, 400);
+  });
+
+  test("a follow-up with a valid replyToId succeeds and threads onto the root id's history", async () => {
+    await fetch(new URL("/feedback", handle.url), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify([{ id: "a-thread-root", comment: "why is this here?" }]),
+    });
+    consumeNextBatch(sessionDir); // drain for isolation from other tests
+
+    const res = await fetch(new URL("/feedback", handle.url), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify([{ id: "a-thread-followup", replyToId: "a-thread-root", comment: "still unclear?" }]),
+    });
+    assert.equal(res.status, 200);
+    consumeNextBatch(sessionDir); // drain for isolation from other tests
+
+    const history = loadThreadHistory(sessionDir, "a-thread-root");
+    assert.deepEqual(
+      history.map((m) => m.text),
+      ["why is this here?", "still unclear?"],
+    );
+  });
+
+  test("a follow-up whose replyToId was never submitted is rejected with 400", async () => {
+    const res = await fetch(new URL("/feedback", handle.url), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify([{ id: "a-orphan-followup", replyToId: "a-never-submitted", comment: "??" }]),
+    });
+    assert.equal(res.status, 400);
+    const body = (await res.json()) as { error: string };
+    assert.match(body.error, /unknown annotation id/);
   });
 });
 

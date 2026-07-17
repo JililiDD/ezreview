@@ -1,7 +1,7 @@
 import { TextDecoder } from "node:util";
 import { sessionDirFor, readSessionInfo } from "./session.js";
 import { checkHealthz, DEFAULT_HOST } from "./server.js";
-import { consumeNextBatch } from "./feedback-queue.js";
+import { consumeNextBatch, loadThreadHistory } from "./feedback-queue.js";
 
 export class WaitError extends Error {}
 
@@ -13,6 +13,7 @@ export interface AnnotationItem {
   outerHTML?: string;
   selectedText?: string;
   context?: { before: string; after: string };
+  replyToId?: string;
   [key: string]: unknown;
 }
 
@@ -20,9 +21,17 @@ function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
-export function renderBatch(items: AnnotationItem[]): string {
+// sessionDir is required (not optional-with-a-degraded-fallback): the only
+// production caller always has one, and a follow-up item silently rendered
+// without its thread history would be a real bug, not a reasonable default.
+export function renderBatch(items: AnnotationItem[], sessionDir: string): string {
   return items
     .map((item) => {
+      if (item.replyToId) {
+        const history = loadThreadHistory(sessionDir, item.replyToId);
+        const historyText = history.map((m) => `  [${m.from}] ${m.text}`).join("\n");
+        return `[${item.id}] Follow-up on thread ${item.replyToId} — full history:\n${historyText}`;
+      }
       const comment = item.comment ?? "";
       if (item.type === "text-annotation") {
         return `[${item.id}] Selected text: "${item.selectedText}" (before: "${item.context?.before ?? ""}", after: "${item.context?.after ?? ""}", near ${item.nearestSelector ?? "?"}). Comment: ${comment}`;
@@ -91,7 +100,7 @@ export async function waitForFeedback(file: string, opts: WaitOptions = {}): Pro
     while (true) {
       const batch = consumeNextBatch(sessionDir) as AnnotationItem[] | null;
       if (batch) {
-        return renderBatch(batch);
+        return renderBatch(batch, sessionDir);
       }
       const chunk = await nextSseChunk(reader, decoder, state);
       if (!chunk.startsWith("event: feedback")) {

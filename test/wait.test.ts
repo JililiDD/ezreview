@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { startReviewServer } from "../src/server.js";
 import { sessionDirFor, writeSessionInfo } from "../src/session.js";
 import { waitForFeedback, renderBatch, WaitError } from "../src/wait.js";
+import { appendThreadMessage } from "../src/feedback-queue.js";
 
 async function setUp(basePort: number) {
   const dir = mkdtempSync(join(tmpdir(), "ai-review-board-wait-test-"));
@@ -26,9 +27,11 @@ async function tearDown(ctx: { dir: string; sessionRoot: string; handle: import(
 
 describe("renderBatch", () => {
   test("renders an element-annotation item with selector, outerHTML, and comment", () => {
-    const text = renderBatch([
-      { id: "a-1", type: "element-annotation", selector: "#x", outerHTML: "<span>x</span>", comment: "too light" },
-    ]);
+    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-renderbatch-test-"));
+    const text = renderBatch(
+      [{ id: "a-1", type: "element-annotation", selector: "#x", outerHTML: "<span>x</span>", comment: "too light" }],
+      dir,
+    );
     assert.match(text, /\[a-1\]/);
     assert.match(text, /#x/);
     assert.match(text, /<span>x<\/span>/);
@@ -36,19 +39,35 @@ describe("renderBatch", () => {
   });
 
   test("renders a text-annotation item with selectedText and context", () => {
-    const text = renderBatch([
-      {
-        id: "a-2",
-        type: "text-annotation",
-        selectedText: "revenue grew",
-        context: { before: "our ", after: " this quarter" },
-        nearestSelector: "#para",
-        comment: "double check",
-      },
-    ]);
+    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-renderbatch-test-"));
+    const text = renderBatch(
+      [
+        {
+          id: "a-2",
+          type: "text-annotation",
+          selectedText: "revenue grew",
+          context: { before: "our ", after: " this quarter" },
+          nearestSelector: "#para",
+          comment: "double check",
+        },
+      ],
+      dir,
+    );
     assert.match(text, /\[a-2\]/);
     assert.match(text, /revenue grew/);
     assert.match(text, /double check/);
+  });
+
+  test("renders a follow-up item (replyToId set) as its thread's full history, not just its own comment", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ai-review-board-renderbatch-followup-test-"));
+    appendThreadMessage(dir, "a-3", "human", "why is this here?");
+    appendThreadMessage(dir, "a-3", "agent", "because the API requires it");
+
+    const text = renderBatch([{ id: "a-4", replyToId: "a-3", comment: "but why does the API require it?" }], dir);
+    assert.match(text, /\[a-4\]/);
+    assert.match(text, /thread a-3/);
+    assert.match(text, /why is this here\?/);
+    assert.match(text, /because the API requires it/);
   });
 });
 
