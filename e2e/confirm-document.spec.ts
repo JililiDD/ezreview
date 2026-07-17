@@ -33,7 +33,7 @@ test("Confirm document sits in the toolbar's former Send all slot; Send all now 
   }
 });
 
-test("clicking Confirm document while the queue is non-empty is blocked with a status message, no confirm dialog", async ({
+test("clicking Confirm document while the queue is non-empty is blocked with a status message, no confirm modal", async ({
   page,
 }) => {
   const { dir, handle } = await startWithFixture("bubble-queue.html", 6310);
@@ -44,21 +44,15 @@ test("clicking Confirm document while the queue is non-empty is blocked with a s
     await page.locator(".bubble-draft textarea").fill("x");
     await page.locator(".bubble-draft .bubble-add").click();
 
-    let dialogShown = false;
-    page.on("dialog", (dialog) => {
-      dialogShown = true;
-      void dialog.dismiss();
-    });
-
     await page.locator("#confirm-document").click();
     await expect(page.locator("#status-text")).toHaveText("Send or clear the queue first");
-    expect(dialogShown).toBe(false);
+    await expect(page.locator("#confirm-modal-backdrop")).not.toHaveClass(/visible/);
   } finally {
     await cleanup(dir, handle);
   }
 });
 
-test("clicking Confirm document with an empty queue shows a native confirm dialog, and confirming resets the session", async ({
+test("clicking Confirm document with an empty queue shows a custom confirm modal, and confirming resets the session and locks the page read-only", async ({
   page,
 }) => {
   const { dir, sessionDir, handle } = await startWithFixture("bubble-queue.html", 6320);
@@ -73,22 +67,39 @@ test("clicking Confirm document with an empty queue shows a native confirm dialo
 
     expect(existsSync(join(sessionDir, "threads.jsonl"))).toBe(true);
 
-    let dialogMessage = "";
-    page.on("dialog", (dialog) => {
-      dialogMessage = dialog.message();
-      void dialog.accept();
-    });
-
     await page.locator("#confirm-document").click();
-    await expect.poll(() => dialogMessage).not.toBe("");
-    expect(dialogMessage.length).toBeGreaterThan(0);
+    await expect(page.locator("#confirm-modal-backdrop")).toHaveClass(/visible/);
+    await expect(page.locator("#confirm-modal")).toContainText("All feedback history will be deleted");
+
+    await page.locator("#confirm-modal-ok").click();
+    await expect(page.locator("#confirm-modal-backdrop")).not.toHaveClass(/visible/);
 
     await expect(page.locator("#confirm-document")).toHaveText("Confirmed");
     await expect(page.locator("#confirm-document")).toBeDisabled();
+    await expect(page.locator("#send-all")).toBeDisabled();
     await expect(page.locator("#status-dot")).toHaveClass(/disconnected/, { timeout: 3000 });
     expect(existsSync(join(sessionDir, "threads.jsonl"))).toBe(false);
     expect(existsSync(join(sessionDir, "feedback-queue.jsonl"))).toBe(false);
     expect(existsSync(join(sessionDir, "submitted-ids.jsonl"))).toBe(false);
+
+    await expect(page.locator("#review-switch")).toHaveAttribute("data-on", "false");
+  } finally {
+    await cleanup(dir, handle);
+  }
+});
+
+test("Cancel on the confirm modal leaves the document editable", async ({ page }) => {
+  const { dir, handle } = await startWithFixture("bubble-queue.html", 6321);
+  try {
+    await page.goto(handle.url);
+    await page.locator("#confirm-document").click();
+    await expect(page.locator("#confirm-modal-backdrop")).toHaveClass(/visible/);
+
+    await page.locator("#confirm-modal-cancel").click();
+    await expect(page.locator("#confirm-modal-backdrop")).not.toHaveClass(/visible/);
+    await expect(page.locator("#confirm-document")).toHaveText("Confirm document");
+    await expect(page.locator("#confirm-document")).toBeEnabled();
+    await expect(page.locator("#send-all")).toBeEnabled();
   } finally {
     await cleanup(dir, handle);
   }

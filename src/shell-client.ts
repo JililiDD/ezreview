@@ -13,20 +13,36 @@ export function renderClientScript(): string {
   var railCollapseAllBtn = document.getElementById("rail-collapse-all");
   var railFooter = document.getElementById("rail-footer");
   var confirmDocumentButton = document.getElementById("confirm-document");
+  var confirmModalBackdrop = document.getElementById("confirm-modal-backdrop");
+  var confirmModalOk = document.getElementById("confirm-modal-ok");
+  var confirmModalCancel = document.getElementById("confirm-modal-cancel");
+  var fileNameLabel = document.getElementById("file-name");
+  var documentReadOnly = false;
+  var documentConfirmed = false;
 
   function setConnected() {
     dot.classList.remove("disconnected");
     statusText.textContent = "";
+    fileNameLabel.textContent = "Agent connected";
   }
 
   function setDisconnected() {
     dot.classList.add("disconnected");
-    statusText.textContent = "Disconnected · retrying…";
+    if (documentConfirmed) {
+      fileNameLabel.textContent = "Agent disconnected";
+      statusText.textContent = "";
+    } else {
+      fileNameLabel.textContent = "Agent connected";
+      statusText.textContent = "Disconnected · retrying…";
+    }
   }
 
   var source = new EventSource("/events");
   source.onopen = setConnected;
   source.onerror = setDisconnected;
+  source.addEventListener("confirmed", function () {
+    documentConfirmed = true;
+  });
   source.addEventListener("reload", function () {
     currentHoverTarget = null;
     hideHighlight();
@@ -1114,6 +1130,7 @@ export function renderClientScript(): string {
     if (node.classList.contains("bubble-collapsed")) replyBtnRow.style.display = "none";
 
     replyBtn.addEventListener("click", function () {
+      if (documentReadOnly) return;
       replyBtnRow.remove();
 
       var wrap = document.createElement("div");
@@ -1264,22 +1281,43 @@ export function renderClientScript(): string {
       });
   });
 
+  function enterReadOnlyMode() {
+    documentReadOnly = true;
+    documentConfirmed = true;
+    confirmDocumentButton.disabled = true;
+    confirmDocumentButton.textContent = "Confirmed";
+    sendAllButton.disabled = true;
+    if (reviewOn) {
+      reviewOn = false;
+      reviewSwitch.setAttribute("data-on", "false");
+      detachOverlayListeners();
+      detachSelectionListeners();
+    }
+    reviewSwitch.style.pointerEvents = "none";
+    reviewSwitch.style.opacity = "0.5";
+  }
+
   confirmDocumentButton.addEventListener("click", function () {
     if (queue.length > 0) {
       showSendFailure("Send or clear the queue first");
       return;
     }
-    if (!window.confirm("Confirm this document is done? All feedback history will be deleted.")) {
-      return;
-    }
+    confirmModalBackdrop.classList.add("visible");
+  });
+
+  confirmModalCancel.addEventListener("click", function () {
+    confirmModalBackdrop.classList.remove("visible");
+  });
+
+  confirmModalOk.addEventListener("click", function () {
+    confirmModalBackdrop.classList.remove("visible");
     fetch("/confirm-document", { method: "POST" })
       .then(function (res) {
         if (!res.ok) {
           showSendFailure("Confirm failed — please retry");
           return;
         }
-        confirmDocumentButton.disabled = true;
-        confirmDocumentButton.textContent = "Confirmed";
+        enterReadOnlyMode();
       })
       .catch(function () {
         showSendFailure("Confirm failed — network error");

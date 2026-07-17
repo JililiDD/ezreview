@@ -135,6 +135,11 @@ export function renderShellPage(): string {
     font-size: 12.5px;
     cursor: pointer;
   }
+  #send-all:disabled {
+    background: var(--chrome-border);
+    color: var(--chrome-dim);
+    cursor: default;
+  }
   #stage {
     flex: 1;
     display: flex;
@@ -249,13 +254,59 @@ export function renderShellPage(): string {
     max-height: 300px;
     overflow-y: auto;
   }
+  #confirm-modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+  }
+  #confirm-modal-backdrop.visible {
+    display: flex;
+  }
+  #confirm-modal {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+    padding: 20px 22px;
+    width: 320px;
+    font-family: system-ui, "Segoe UI", sans-serif;
+    color: #1c1e22;
+  }
+  #confirm-modal p {
+    margin: 0 0 18px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  #confirm-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  #confirm-modal-actions button {
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  #confirm-modal-cancel {
+    background: #eef0f3;
+    color: #33363c;
+  }
+  #confirm-modal-ok {
+    background: var(--accent);
+    color: #fff;
+  }
 </style>
 </head>
 <body>
   <div id="toolbar">
     <div id="file-status">
       <span id="status-dot"></span>
-      <span id="file-name">artifact</span>
+      <span id="file-name">Agent connected</span>
       <span id="status-text"></span>
     </div>
     <div id="spacer"></div>
@@ -279,6 +330,15 @@ export function renderShellPage(): string {
       <div id="rail-footer">
         <span id="reply-spinner" title="Waiting for the agent to reply"></span>
         <button id="send-all">Send all (0)</button>
+      </div>
+    </div>
+  </div>
+  <div id="confirm-modal-backdrop">
+    <div id="confirm-modal">
+      <p>Confirm this document is done? All feedback history will be deleted.</p>
+      <div id="confirm-modal-actions">
+        <button id="confirm-modal-cancel">Cancel</button>
+        <button id="confirm-modal-ok">OK</button>
       </div>
     </div>
   </div>
