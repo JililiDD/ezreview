@@ -1,6 +1,6 @@
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse, type Server } from "node:http";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { renderShellPage } from "./shell.js";
 import { SseHub } from "./sse.js";
 import { watchArtifactFile } from "./watcher.js";
@@ -61,7 +61,7 @@ export function createRequestHandler(
     const pathname = (req.url ?? "/").split("?")[0];
 
     if (pathname === "/" && req.method === "GET") {
-      const body = renderShellPage();
+      const body = renderShellPage(basename(absoluteArtifactPath));
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end(body);
       return;

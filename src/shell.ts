@@ -1,6 +1,15 @@
 import { renderClientScript } from "./shell-client.js";
 
-export function renderShellPage(): string {
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+export function renderShellPage(fileName: string): string {
+  const safeFileName = escapeHtml(fileName);
   return `<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
@@ -135,8 +144,17 @@ export function renderShellPage(): string {
     background: var(--disconnect-red);
     box-shadow: 0 0 8px var(--disconnect-red), 0 0 2px var(--disconnect-red);
   }
+  #agent-status {
+    color: var(--chrome-fg);
+  }
   #file-name {
     color: var(--chrome-fg);
+    font-weight: 600;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 40vw;
   }
   #status-text {
     color: var(--disconnect-red);
@@ -429,16 +447,17 @@ export function renderShellPage(): string {
     <span id="wordmark">ezreview</span>
     <div id="file-status">
       <span id="status-dot"></span>
-      <span id="file-name">Agent connected</span>
+      <span id="agent-status">Agent connected</span>
       <span id="status-text"></span>
     </div>
     <div id="spacer"></div>
+    <span id="file-name">${safeFileName}</span>
+    <div id="spacer-2"></div>
     <div id="review-toggle">
       <span>REVIEW MODE</span>
       <span class="switch" id="review-switch" data-on="true"><span class="switch-knob"></span></span>
     </div>
     <span id="scroll-hint">Scroll while hovering to widen the selection</span>
-    <div id="spacer-2"></div>
     <button id="theme-toggle" title="Toggle light/dark theme">☀︎</button>
     <button id="confirm-document">Approve</button>
   </div>

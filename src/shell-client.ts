@@ -16,7 +16,7 @@ export function renderClientScript(): string {
   var confirmModalBackdrop = document.getElementById("confirm-modal-backdrop");
   var confirmModalOk = document.getElementById("confirm-modal-ok");
   var confirmModalCancel = document.getElementById("confirm-modal-cancel");
-  var fileNameLabel = document.getElementById("file-name");
+  var agentStatusLabel = document.getElementById("agent-status");
   var themeToggleButton = document.getElementById("theme-toggle");
   var documentReadOnly = false;
   var documentConfirmed = false;
@@ -56,16 +56,16 @@ export function renderClientScript(): string {
   function setConnected() {
     dot.classList.remove("disconnected");
     statusText.textContent = "";
-    fileNameLabel.textContent = "Agent connected";
+    agentStatusLabel.textContent = "Agent connected";
   }
 
   function setDisconnected() {
     dot.classList.add("disconnected");
     if (documentConfirmed) {
-      fileNameLabel.textContent = "Agent disconnected";
+      agentStatusLabel.textContent = "Agent disconnected";
       statusText.textContent = "";
     } else {
-      fileNameLabel.textContent = "Agent connected";
+      agentStatusLabel.textContent = "Agent connected";
       statusText.textContent = "Disconnected · retrying…";
     }
   }
