@@ -8,8 +8,9 @@ function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
-export function renderShellPage(fileName: string): string {
+export function renderShellPage(fileName: string, filePath: string): string {
   const safeFileName = escapeHtml(fileName);
+  const safeFilePath = escapeHtml(filePath);
   return `<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
@@ -451,7 +452,7 @@ export function renderShellPage(fileName: string): string {
       <span id="status-text"></span>
     </div>
     <div id="spacer"></div>
-    <span id="file-name">${safeFileName}</span>
+    <span id="file-name" title="${safeFilePath}">${safeFileName}</span>
     <div id="spacer-2"></div>
     <div id="review-toggle">
       <span>REVIEW MODE</span>

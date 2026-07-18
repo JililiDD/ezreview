@@ -109,6 +109,36 @@ test("submitting a follow-up via the persistent input queues it and threads it a
   }
 });
 
+test("replying with a follow-up child id renders the answer in its root bubble", async ({ page }) => {
+  const { dir, handle } = await startWithFixture("bubble-queue.html", 6207);
+  try {
+    await page.goto(handle.url);
+    await queueAndSend(page, "root question");
+
+    const bubble = page.locator(".bubble");
+    await bubble.locator(".followup-reply-btn").click();
+    await bubble.locator(".followup-controls textarea").fill("follow-up question");
+    await bubble.locator(".followup-controls .bubble-add").click();
+    const childId = await page.evaluate(() => {
+      const queue = (window as unknown as { __annotationQueue: Array<{ id: string }> }).__annotationQueue;
+      return queue[0].id;
+    });
+    await page.locator("#send-all").click();
+
+    const res = await fetch(new URL("/reply", handle.url), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: childId, text: "reply sent to child id" }),
+    });
+    expect(res.status).toBe(200);
+
+    await expect(bubble.locator(".answer-block .answer-text")).toHaveText("reply sent to child id");
+    await expect(page.locator("#reply-spinner")).not.toHaveClass(/visible/);
+  } finally {
+    await cleanup(dir, handle);
+  }
+});
+
 test("a reply to an already-sent annotation still renders correctly after an unrelated reload", async ({ page }) => {
   const { dir, artifactPath, handle } = await startWithFixture("bubble-queue.html", 6210);
   const { writeFileSync } = await import("node:fs");

@@ -81,6 +81,7 @@ test("clicking Confirm document with an empty queue shows a custom confirm modal
     expect(existsSync(join(sessionDir, "threads.jsonl"))).toBe(false);
     expect(existsSync(join(sessionDir, "feedback-queue.jsonl"))).toBe(false);
     expect(existsSync(join(sessionDir, "submitted-ids.jsonl"))).toBe(false);
+    expect(existsSync(join(sessionDir, "thread-roots.jsonl"))).toBe(false);
 
     await expect(page.locator("#review-switch")).toHaveAttribute("data-on", "false");
   } finally {

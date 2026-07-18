@@ -57,7 +57,7 @@ Blocks until the reviewer clicks "Submit reviews", then prints one batch of anno
 - Safe to rerun after a timeout/kill: each batch is consumed exactly once, so a rerun returns the next unconsumed batch — never a duplicate, never a gap.
 - Fails immediately with a clear error if there's no running session for the file (run `open` first).
 
-Each annotation includes a stable id (e.g. `a-3`), plus either an element's `selector`/`outerHTML` or a text selection's `selectedText`/`context`, and the reviewer's comment.
+Each annotation includes a stable id (e.g. `a-3`), plus either an element's `selector`/`outerHTML` or a text selection's `selectedText`/`context`, and the reviewer's comment. Follow-ups also include `Reply target: <root id>`; use that id with `reply`.
 
 ### `ezreview reply <file.html> --to <id> "<response text>"` — respond to an annotation
 
@@ -65,6 +65,7 @@ Sends a response that renders inline in the browser, inside the bubble for that 
 
 - Quote `"<answer text>"` as a single argument — an unquoted answer gets split by the shell and truncated.
 - Supports multiple rounds per thread (the reviewer can keep the conversation going).
+- A submitted follow-up child id is normalized to its root thread, and the CLI reports the actual root id used.
 - Does not touch the artifact file.
 
 Run `ezreview --help` for the full usage summary.

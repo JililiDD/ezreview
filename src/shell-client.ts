@@ -113,9 +113,10 @@ export function renderClientScript(): string {
 
   source.addEventListener("reply", function (e) {
     var data = JSON.parse(e.data);
-    delete pendingReplyIds[data.id];
+    var rootId = threadRootById[data.id] || data.id;
+    delete pendingReplyIds[rootId];
     updateReplySpinner();
-    var node = findAnnotationNodeById(data.id);
+    var node = findAnnotationNodeById(rootId);
     if (!node) return;
     renderAnswer(node, data.text);
   });
@@ -448,6 +449,10 @@ export function renderClientScript(): string {
   var nextQueueId = 1;
   var sentItems = [];
   window.__sentAnnotations = sentItems;
+  // Defensive client-side child -> root lookup. Fixed servers always emit
+  // root ids, but retaining this mapping prevents a child-id reply event
+  // from becoming invisible if it comes from an older or malformed server.
+  var threadRootById = {};
   // Root ids (never a follow-up's own id — replies always target the
   // thread root) still awaiting at least one reply from the most recent
   // Send all batch. The spinner shows while this is non-empty.
@@ -764,17 +769,13 @@ export function renderClientScript(): string {
 
   // ---- Text annotation re-anchoring after a reload ----
   //
-  // A lost text annotation's original selectedText may simply have moved
-  // (an unrelated edit shifted it) or may have been replaced outright by
-  // the very edit the annotation asked for — in the latter case the
-  // annotation should stay lost, since the text it was about is gone.
-  // Both cases are told apart by anchoring on context.before/context.after
-  // alone (never on the old selectedText): if the same landmarks on both
-  // sides of the original selection can be found again, uniquely, with a
-  // plausibly small gap between them, whatever now sits in that gap — same
-  // text or edited text — is treated as this annotation's current location.
-
-  var REANCHOR_MAX_GAP = 500;
+  // Re-anchor inside nearestSelector first. An unchanged selectedText must
+  // be unique within that element; if it was edited or appears more than
+  // once, the locally captured before/after landmarks must identify exactly
+  // one gap. There is no arbitrary character limit: the element itself is
+  // the structural boundary. If the selector disappeared, only a globally
+  // unique unchanged selectedText is safe enough to recover — never guess a
+  // replacement from document-wide context.
 
   function buildTextIndex(root) {
     var doc = root.ownerDocument;
@@ -810,58 +811,34 @@ export function renderClientScript(): string {
     return first;
   }
 
-  function resolveTextAnnotationScope(item) {
-    // Deliberately NOT item.nearestSelector: getTextContext climbs ancestors
-    // independently (until it finds ~200 chars of surrounding text, capped
-    // at <html>) to build context.before/after, so the captured context can
-    // reach well outside nearestSelector's element for a short paragraph.
-    // The search scope has to match that same real ceiling — the shadow
-    // root boundary for shadow content (climbing can't escape it either,
-    // since a shadow root has no parentElement), <html> otherwise.
+  function resolveTextAnnotationRoot(item) {
     var doc = getIframeDoc();
     if (!doc) return null;
     if (item.shadowHost) {
       try {
         var host = doc.querySelector(item.shadowHost);
         if (host && host.shadowRoot) return host.shadowRoot;
+        return null;
       } catch (e) {
-        // fall through to the top-level document
+        return null;
       }
     }
     return doc.documentElement || doc.body;
   }
 
-  function tryReanchorTextAnnotation(item) {
-    var scopeRoot = resolveTextAnnotationScope(item);
-    if (!scopeRoot) return null;
-    var index = buildTextIndex(scopeRoot);
-    var text = index.text;
-    var before = (item.context && item.context.before) || "";
-    var after = (item.context && item.context.after) || "";
-
-    var beforeEnd;
-    if (before === "") {
-      beforeEnd = 0;
-    } else {
-      var beforeStart = findUniqueOccurrence(text, before);
-      if (beforeStart === -1) return null;
-      beforeEnd = beforeStart + before.length;
+  function resolveTextAnnotationScope(item, searchRoot) {
+    if (!searchRoot || !item.nearestSelector) return null;
+    try {
+      return searchRoot.querySelector(item.nearestSelector);
+    } catch (e) {
+      return null;
     }
+  }
 
-    var afterStart;
-    if (after === "") {
-      afterStart = text.length;
-    } else {
-      afterStart = findUniqueOccurrence(text, after);
-      if (afterStart === -1) return null;
-    }
-
-    if (afterStart < beforeEnd || afterStart - beforeEnd > REANCHOR_MAX_GAP) return null;
-
-    var startPoint = pointAtOffset(index, beforeEnd);
-    var endPoint = pointAtOffset(index, afterStart);
+  function rangeFromOffsets(scopeRoot, index, start, end) {
+    var startPoint = pointAtOffset(index, start);
+    var endPoint = pointAtOffset(index, end);
     if (!startPoint || !endPoint) return null;
-
     var range = scopeRoot.ownerDocument.createRange();
     try {
       range.setStart(startPoint.node, startPoint.offset);
@@ -870,6 +847,61 @@ export function renderClientScript(): string {
       return null;
     }
     return range;
+  }
+
+  function occurrenceStarts(text, needle) {
+    if (needle === "") return [0];
+    var starts = [];
+    var from = 0;
+    var found;
+    while ((found = text.indexOf(needle, from)) !== -1) {
+      starts.push(found);
+      from = found + Math.max(needle.length, 1);
+    }
+    return starts;
+  }
+
+  function findUniqueContextGap(text, context) {
+    var before = (context && context.before) || "";
+    var after = (context && context.after) || "";
+    var beforeStarts = occurrenceStarts(text, before);
+    var afterStarts = after === "" ? [text.length] : occurrenceStarts(text, after);
+    var match = null;
+    for (var i = 0; i < beforeStarts.length; i++) {
+      var start = beforeStarts[i] + before.length;
+      for (var j = 0; j < afterStarts.length; j++) {
+        var end = afterStarts[j];
+        if (end < start) continue;
+        if (match) return null;
+        match = { start: start, end: end };
+      }
+    }
+    return match;
+  }
+
+  function tryReanchorTextAnnotation(item) {
+    var searchRoot = resolveTextAnnotationRoot(item);
+    if (!searchRoot) return null;
+    var scopeRoot = resolveTextAnnotationScope(item, searchRoot);
+
+    if (scopeRoot) {
+      var localIndex = buildTextIndex(scopeRoot);
+      var exactStart = findUniqueOccurrence(localIndex.text, item.selectedText || "");
+      if (exactStart !== -1) {
+        return rangeFromOffsets(scopeRoot, localIndex, exactStart, exactStart + item.selectedText.length);
+      }
+
+      if (item.localContext) {
+        var gap = findUniqueContextGap(localIndex.text, item.localContext);
+        if (gap) return rangeFromOffsets(scopeRoot, localIndex, gap.start, gap.end);
+      }
+      return null;
+    }
+
+    var globalIndex = buildTextIndex(searchRoot);
+    var globalStart = findUniqueOccurrence(globalIndex.text, item.selectedText || "");
+    if (globalStart === -1) return null;
+    return rangeFromOffsets(searchRoot, globalIndex, globalStart, globalStart + item.selectedText.length);
   }
 
   function reanchorLostTextAnnotations() {
@@ -938,6 +970,7 @@ export function renderClientScript(): string {
         type: "text-annotation",
         selectedText: draftBubble.selectedText,
         context: draftBubble.context,
+        localContext: draftBubble.localContext,
         nearestSelector: draftBubble.nearestSelectorResult.selector,
         shadowHost: draftBubble.nearestSelectorResult.shadowHost,
         comment: comment,
@@ -1057,22 +1090,8 @@ export function renderClientScript(): string {
     return node;
   }
 
-  function getTextContext(range) {
-    // Climb to an ancestor with enough surrounding text, then build
-    // before/after ranges via native Range semantics (start-of-ancestor to
-    // selection-start, and selection-end to end-of-ancestor). This handles
-    // both text-node and element-boundary containers uniformly — Range's
-    // own toString() flattens across element boundaries correctly, which a
-    // manual sibling-walk over startContainer's own children would not
-    // (that fails when the selection starts/ends exactly at a child index
-    // with nothing earlier *inside* that same container).
-    var ancestorEl = range.commonAncestorContainer;
-    if (ancestorEl.nodeType !== 1) ancestorEl = ancestorEl.parentElement;
-    while (ancestorEl && ancestorEl.parentElement && ancestorEl.textContent.length < 200) {
-      ancestorEl = ancestorEl.parentElement;
-    }
+  function getTextContextWithin(range, ancestorEl) {
     if (!ancestorEl) return { before: "", after: "" };
-
     var beforeRange = range.cloneRange();
     beforeRange.collapse(true);
     beforeRange.setStart(ancestorEl, 0);
@@ -1089,12 +1108,32 @@ export function renderClientScript(): string {
     };
   }
 
+  function getTextContext(range) {
+    // Climb to an ancestor with enough surrounding text, then build
+    // before/after ranges via native Range semantics (start-of-ancestor to
+    // selection-start, and selection-end to end-of-ancestor). This handles
+    // both text-node and element-boundary containers uniformly — Range's
+    // own toString() flattens across element boundaries correctly, which a
+    // manual sibling-walk over startContainer's own children would not
+    // (that fails when the selection starts/ends exactly at a child index
+    // with nothing earlier *inside* that same container).
+    var ancestorEl = range.commonAncestorContainer;
+    if (ancestorEl.nodeType !== 1) ancestorEl = ancestorEl.parentElement;
+    while (ancestorEl && ancestorEl.parentElement && ancestorEl.textContent.length < 200) {
+      ancestorEl = ancestorEl.parentElement;
+    }
+    if (!ancestorEl) return { before: "", after: "" };
+
+    return getTextContextWithin(range, ancestorEl);
+  }
+
   function openTextDraftBubble(range) {
     if (draftBubble) closeDraftBubble();
 
     var selectedText = range.toString();
-    var context = getTextContext(range);
     var ancestorEl = nearestElementAncestor(range.commonAncestorContainer);
+    var context = getTextContext(range);
+    var localContext = getTextContextWithin(range, ancestorEl);
     var nearestSelectorResult = ancestorEl ? generateSelector(ancestorEl) : { selector: null, shadowHost: null };
 
     if (textHighlightSet) textHighlightSet.add(range);
@@ -1117,6 +1156,7 @@ export function renderClientScript(): string {
       range: range,
       selectedText: selectedText,
       context: context,
+      localContext: localContext,
       nearestSelectorResult: nearestSelectorResult,
       textarea: controls.textarea,
     };
@@ -1229,6 +1269,7 @@ export function renderClientScript(): string {
 
   function queueFollowUp(rootId, text, node) {
     var id = "a-" + nextQueueId++;
+    threadRootById[id] = rootId;
     var item = {
       id: id,
       node: null,

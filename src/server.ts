@@ -5,7 +5,13 @@ import { renderShellPage } from "./shell.js";
 import { SseHub } from "./sse.js";
 import { watchArtifactFile } from "./watcher.js";
 import { watchForIdle, DEFAULT_IDLE_TIMEOUT_MS } from "./idle-exit.js";
-import { appendBatch, loadSubmittedIds, appendThreadMessage, resetSessionFiles } from "./feedback-queue.js";
+import {
+  appendBatch,
+  loadSubmittedIds,
+  appendThreadMessage,
+  loadThreadRoots,
+  resetSessionFiles,
+} from "./feedback-queue.js";
 import { sessionDirFor } from "./session.js";
 
 export const DEFAULT_HOST = "127.0.0.1";
@@ -61,7 +67,7 @@ export function createRequestHandler(
     const pathname = (req.url ?? "/").split("?")[0];
 
     if (pathname === "/" && req.method === "GET") {
-      const body = renderShellPage(basename(absoluteArtifactPath));
+      const body = renderShellPage(basename(absoluteArtifactPath), absoluteArtifactPath);
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end(body);
       return;
@@ -154,13 +160,14 @@ export function createRequestHandler(
             res.end(JSON.stringify({ error: `unknown annotation id: ${id}` }));
             return;
           }
-          // No "already answered" cap — id is always a thread root id, and a
-          // thread can receive any number of agent replies across its
-          // lifetime (multi-round Q&A, not one-shot).
-          appendThreadMessage(sessionDir, id, "agent", text);
-          sseHub.broadcast("reply", { id, text });
+          // Callers may pass either the root annotation id or a follow-up's
+          // child id. Normalize both to the durable root so history and SSE
+          // always address the one bubble that owns the thread.
+          const rootId = loadThreadRoots(sessionDir).get(id) ?? id;
+          appendThreadMessage(sessionDir, rootId, "agent", text);
+          sseHub.broadcast("reply", { id: rootId, text });
           res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-          res.end(JSON.stringify({ ok: true }));
+          res.end(JSON.stringify({ ok: true, id: rootId }));
         })
         .catch(() => {
           res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });

@@ -143,8 +143,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   }
 
   try {
-    await sendReply(parsed.file, parsed.to, parsed.text);
-    process.stdout.write(`Reply sent to ${parsed.to}.\n`);
+    const replyId = await sendReply(parsed.file, parsed.to, parsed.text);
+    process.stdout.write(`Reply sent to ${replyId}.\n`);
     return 0;
   } catch (err) {
     if (err instanceof ReplyError) {

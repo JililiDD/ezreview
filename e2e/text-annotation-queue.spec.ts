@@ -5,7 +5,12 @@ import { join } from "node:path";
 import { startReviewServer } from "../src/server.ts";
 import type { ReviewServerHandle } from "../src/server.ts";
 
-async function selectSubstring(page: import("@playwright/test").Page, elementSelector: string, needle: string) {
+async function selectSubstring(
+  page: import("@playwright/test").Page,
+  elementSelector: string,
+  needle: string,
+  occurrence = 0,
+) {
   await page.evaluate(
     (args) => {
       const frame = document.getElementById("artifact-frame") as HTMLIFrameElement;
@@ -13,7 +18,13 @@ async function selectSubstring(page: import("@playwright/test").Page, elementSel
       const el = doc.querySelector(args.sel)!;
       const textNode = el.firstChild!;
       const full = textNode.textContent || "";
-      const start = full.indexOf(args.needle);
+      let start = -1;
+      let from = 0;
+      for (let i = 0; i <= args.occurrence; i++) {
+        start = full.indexOf(args.needle, from);
+        if (start === -1) break;
+        from = start + args.needle.length;
+      }
       if (start === -1) throw new Error("needle not found in fixture text: " + args.needle);
       const range = doc.createRange();
       range.setStart(textNode, start);
@@ -23,7 +34,7 @@ async function selectSubstring(page: import("@playwright/test").Page, elementSel
       selection.addRange(range);
       doc.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
     },
-    { sel: elementSelector, needle },
+    { sel: elementSelector, needle, occurrence },
   );
 }
 
@@ -81,6 +92,8 @@ test("Add to queue stores selectedText, context, and nearestSelector correctly",
   expect(item.selectedText).toBe("testing text selection");
   expect(item.context.before.endsWith("sentence for ")).toBe(true);
   expect(item.context.after.startsWith(" annotation behavior")).toBe(true);
+  expect(item.localContext.before.endsWith("sentence for ")).toBe(true);
+  expect(item.localContext.after.startsWith(" annotation behavior")).toBe(true);
   expect(item.nearestSelector).toBe("#para");
   expect(item.comment).toBe("check this");
 });
@@ -250,6 +263,65 @@ test("a text annotation survives a reload that only edited an unrelated part of 
   }
 });
 
+test("a text anchor in a short metadata element survives an edit to a later section", async ({ page }) => {
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-reanchor-local-scope-e2e-"));
+  const localArtifact = join(localDir, "demo.html");
+  const originalHtml = `<!doctype html><html><body><main>
+    <h2 id="metadata">created: 2026-07-17 scope: New Feature status: active</h2>
+    <section><h2>Requirement</h2><h3>Summary</h3><p>Previous English summary that will be translated.</p>
+    <p>Additional context long enough to make main exceed two hundred characters. Existing context and confirmed decisions continue below for realistic markdown output.</p></section>
+  </main></body></html>`;
+  writeFileSync(localArtifact, originalHtml);
+  const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5535 });
+
+  try {
+    await page.goto(localHandle.url);
+    await selectSubstring(page, "#metadata", "active");
+    await queueCurrentSelection(page, "x");
+
+    writeFileSync(
+      localArtifact,
+      originalHtml.replace("Previous English summary that will be translated.", "这里是已经翻译完成的中文摘要。"),
+    );
+    await page.waitForTimeout(1200);
+
+    const bubble = page.locator(".bubble");
+    await bubble.hover();
+    await expect(bubble.locator(".anchor-lost-badge")).toHaveCount(0);
+    const highlightedText = await page.evaluate(() => (window as any).__annotationQueue[0].range.toString());
+    expect(highlightedText).toBe("active");
+  } finally {
+    await localHandle.close();
+    rmSync(localDir, { recursive: true, force: true });
+  }
+});
+
+test("a locally scoped replacement can exceed 500 characters", async ({ page }) => {
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-reanchor-long-replacement-e2e-"));
+  const localArtifact = join(localDir, "demo.html");
+  writeFileSync(localArtifact, '<html><body><p id="para">before TARGET after</p></body></html>');
+  const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5537 });
+
+  try {
+    await page.goto(localHandle.url);
+    await selectSubstring(page, "#para", "TARGET");
+    await queueCurrentSelection(page, "x");
+
+    const replacement = "X".repeat(700);
+    writeFileSync(localArtifact, `<html><body><p id="para">before ${replacement} after</p></body></html>`);
+    await page.waitForTimeout(1200);
+
+    const bubble = page.locator(".bubble");
+    await bubble.hover();
+    await expect(bubble.locator(".anchor-lost-badge")).toHaveCount(0);
+    const highlightedText = await page.evaluate(() => (window as any).__annotationQueue[0].range.toString());
+    expect(highlightedText).toBe(replacement);
+  } finally {
+    await localHandle.close();
+    rmSync(localDir, { recursive: true, force: true });
+  }
+});
+
 test("a text annotation whose selected text was itself edited re-anchors to the replacement text", async ({ page }) => {
   const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-reanchor-replaced-e2e-"));
   const localArtifact = join(localDir, "demo.html");
@@ -283,7 +355,60 @@ test("a text annotation whose selected text was itself edited re-anchors to the 
   }
 });
 
-test("a text annotation stays lost when its context landmarks are now ambiguous (found more than once)", async ({ page }) => {
+test("a missing nearestSelector falls back only to a globally unique unchanged selectedText", async ({ page }) => {
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-reanchor-missing-selector-e2e-"));
+  const localArtifact = join(localDir, "demo.html");
+  writeFileSync(localArtifact, '<html><body><p id="para">before TARGET after</p></body></html>');
+  const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5545 });
+
+  try {
+    await page.goto(localHandle.url);
+    await selectSubstring(page, "#para", "TARGET");
+    await queueCurrentSelection(page, "x");
+
+    writeFileSync(localArtifact, '<html><body><section><div>moved TARGET text</div></section></body></html>');
+    await page.waitForTimeout(1200);
+
+    const bubble = page.locator(".bubble");
+    await bubble.hover();
+    await expect(bubble.locator(".anchor-lost-badge")).toHaveCount(0);
+    const highlightedText = await page.evaluate(() => (window as any).__annotationQueue[0].range.toString());
+    expect(highlightedText).toBe("TARGET");
+  } finally {
+    await localHandle.close();
+    rmSync(localDir, { recursive: true, force: true });
+  }
+});
+
+test("local context disambiguates repeated selectedText inside the nearest element", async ({ page }) => {
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-reanchor-local-disambiguation-e2e-"));
+  const localArtifact = join(localDir, "demo.html");
+  writeFileSync(localArtifact, '<html><body><p id="para">default: TARGET; workflow status: TARGET end</p></body></html>');
+  const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5547 });
+
+  try {
+    await page.goto(localHandle.url);
+    await selectSubstring(page, "#para", "TARGET", 1);
+    await queueCurrentSelection(page, "x");
+
+    writeFileSync(localArtifact, '<html><body><p id="para">default: TARGET; workflow status: TARGET end</p></body></html>');
+    await page.waitForTimeout(1200);
+
+    const bubble = page.locator(".bubble");
+    await bubble.hover();
+    await expect(bubble.locator(".anchor-lost-badge")).toHaveCount(0);
+    const offset = await page.evaluate(() => {
+      const item = (window as any).__annotationQueue[0];
+      return item.range.startOffset;
+    });
+    expect(offset).toBe("default: TARGET; workflow status: ".length);
+  } finally {
+    await localHandle.close();
+    rmSync(localDir, { recursive: true, force: true });
+  }
+});
+
+test("a text annotation stays lost when text and context are ambiguous inside its nearest element", async ({ page }) => {
   const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-reanchor-ambiguous-e2e-"));
   const localArtifact = join(localDir, "demo.html");
   // A paragraph long enough (>200 chars) that getTextContext's ancestor
@@ -302,11 +427,10 @@ test("a text annotation stays lost when its context landmarks are now ambiguous 
     await selectSubstring(page, "#para", "TARGETWORD");
     await queueCurrentSelection(page, "x");
 
-    // Duplicate the whole paragraph verbatim elsewhere in the page — its
-    // before/after context now matches in two places, so the re-anchor must
-    // refuse the ambiguous match rather than guess which one is "it".
-    const original = readFileSync(localArtifact, "utf-8");
-    writeFileSync(localArtifact, original.replace("</body>", `<p>${longSentence}</p></body>`));
+    // Duplicate the whole sentence inside the same nearestSelector. Both
+    // selectedText and local before/after landmarks now match twice, so the
+    // re-anchor must refuse the ambiguous match rather than guess.
+    writeFileSync(localArtifact, `<html><body><p id="para">${longSentence}<br>${longSentence}</p></body></html>`);
     await page.waitForTimeout(1200);
 
     const bubble = page.locator(".bubble");

@@ -2,7 +2,7 @@ import { TextDecoder } from "node:util";
 import { request as httpRequest, type IncomingMessage, type ClientRequest } from "node:http";
 import { sessionDirFor, readSessionInfo } from "./session.js";
 import { checkHealthz, DEFAULT_HOST } from "./server.js";
-import { consumeNextBatch, loadThreadHistory } from "./feedback-queue.js";
+import { consumeNextBatch, loadThreadHistory, loadThreadRoots } from "./feedback-queue.js";
 
 export class WaitError extends Error {}
 
@@ -32,12 +32,14 @@ function truncate(text: string, max: number): string {
 // production caller always has one, and a follow-up item silently rendered
 // without its thread history would be a real bug, not a reasonable default.
 export function renderBatch(items: AnnotationItem[], sessionDir: string): string {
+  const threadRoots = loadThreadRoots(sessionDir);
   return items
     .map((item) => {
       if (item.replyToId) {
-        const history = loadThreadHistory(sessionDir, item.replyToId);
+        const rootId = threadRoots.get(item.id) ?? threadRoots.get(item.replyToId) ?? item.replyToId;
+        const history = loadThreadHistory(sessionDir, rootId);
         const historyText = history.map((m) => `  [${m.from}] ${m.text}`).join("\n");
-        return `[${item.id}] Follow-up on thread ${item.replyToId} — full history:\n${historyText}`;
+        return `[${item.id}] Follow-up on thread ${rootId}\nReply target: ${rootId}\nFull history:\n${historyText}`;
       }
       const comment = item.comment ?? "";
       if (item.type === "text-annotation") {

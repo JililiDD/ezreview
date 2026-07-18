@@ -28,7 +28,7 @@ ezreview wait report.html
 - Blocks until the reviewer clicks "Send all" in the browser, then prints one batch of annotations as structured, readable text to stdout and exits 0.
 - **If a batch was already sent before you called `wait`, you still get it immediately** — nothing is lost by calling `wait` late.
 - **If your shell/host kills `wait` due to a command timeout, just run it again.** Feedback is durably queued server-side and consumed exactly once per `wait` call; a killed-and-rerun `wait` will still return the next unconsumed batch, never a duplicate and never a gap. Do not build your own retry/backoff logic around this — a plain rerun is the correct and complete recovery.
-- Each annotation in the output has a stable id (e.g. `a-3`), an element `selector` and (truncated) `outerHTML` for element annotations, or `selectedText`/surrounding `context` for text-selection annotations, and the reviewer's `comment`. Use the id when replying (see below).
+- Each annotation in the output has a stable id (e.g. `a-3`), an element `selector` and (truncated) `outerHTML` for element annotations, or `selectedText`/surrounding `context` for text-selection annotations, and the reviewer's `comment`. For a follow-up, `wait` also prints `Reply target: <root id>`; use that root id when replying.
 - If there is no running session for the file (you haven't called `open` yet, or the server has since auto-exited), `wait` fails immediately with a clear error instead of hanging — run `open` first.
 - Annotation ids and "has this been answered" state are durable — they survive an idle auto-exit + restart, so an id from an old `wait` batch is still valid to `reply` to even if the session restarted in between.
 
@@ -41,7 +41,7 @@ ezreview reply report.html --to a-3 "Updated the date to 08-14."
 - Use this once for **every submitted annotation** after handling it. Questions get an answer; change requests get a concise completion summary after the file is edited.
 - **Always quote `"<answer text>"` as a single shell argument.** The command only reads exactly one argument after `--to <id>` as the answer text — if you pass it unquoted, your shell will split it on whitespace and only the first word is used as the answer, with the rest silently discarded. Quote it exactly like the example above, always, even for short answers.
 - The reviewer sees the response rendered directly inside the annotation bubble in the browser, without needing to reload or re-run `wait`.
-- **One answer per annotation, ever.** A second `reply --to <same id>` is rejected (non-zero exit, error printed) — there is no follow-up/threaded conversation. If the reviewer wants to say more, they'll create a new annotation with a new id.
+- Threads support multiple rounds. For follow-ups, reply to the `Reply target` printed by `wait`; the server also normalizes a submitted child id to its root thread as a defensive fallback.
 - `reply` does not touch the artifact file at all.
 
 ## Deciding: edit, then reply

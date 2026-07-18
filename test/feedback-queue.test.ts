@@ -3,7 +3,14 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { appendBatch, consumeNextBatch, loadSubmittedIds, appendThreadMessage, loadThreadHistory } from "../src/feedback-queue.js";
+import {
+  appendBatch,
+  consumeNextBatch,
+  loadSubmittedIds,
+  appendThreadMessage,
+  loadThreadHistory,
+  loadThreadRoots,
+} from "../src/feedback-queue.js";
 
 describe("feedback-queue", () => {
   let dir: string;
@@ -86,6 +93,26 @@ describe("feedback-queue", () => {
     assert.equal(history[1].text, "still unclear, can you say more?");
     // The follow-up's own id never becomes a thread of its own.
     assert.deepEqual(loadThreadHistory(sessionDir, "a-2"), []);
+  });
+
+  test("appendBatch durably maps follow-up ids to the root and flattens nested references", () => {
+    const sessionDir = join(dir, "thread-roots");
+    appendBatch(sessionDir, [{ id: "a-1", comment: "root" }]);
+    appendBatch(sessionDir, [{ id: "a-2", replyToId: "a-1", comment: "follow-up" }]);
+    appendBatch(sessionDir, [{ id: "a-3", replyToId: "a-2", comment: "nested follow-up" }]);
+
+    assert.deepEqual(
+      loadThreadRoots(sessionDir),
+      new Map([
+        ["a-1", "a-1"],
+        ["a-2", "a-1"],
+        ["a-3", "a-1"],
+      ]),
+    );
+    assert.deepEqual(
+      loadThreadHistory(sessionDir, "a-1").map((message) => message.text),
+      ["root", "follow-up", "nested follow-up"],
+    );
   });
 
   test("appendThreadMessage persists agent replies durably, and loadThreadHistory returns them in chronological order", () => {

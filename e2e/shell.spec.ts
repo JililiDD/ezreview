@@ -6,11 +6,12 @@ import { startReviewServer } from "../src/server.ts";
 import type { ReviewServerHandle } from "../src/server.ts";
 
 let dir: string;
+let artifactPath: string;
 let handle: ReviewServerHandle;
 
 test.beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), "ezreview-e2e-"));
-  const artifactPath = join(dir, "demo.html");
+  artifactPath = join(dir, "demo.html");
   writeFileSync(artifactPath, "<html><body><h1>Demo artifact</h1></body></html>");
   handle = await startReviewServer({ artifactPath, basePort: 4700 });
 });
@@ -27,6 +28,10 @@ test("shell page shows the dark toolbar and loads the artifact in the iframe", a
   await expect(toolbar).toBeVisible();
   await expect(toolbar).toHaveCSS("height", "48px");
   await expect(toolbar).toHaveCSS("background-color", "rgba(18, 24, 38, 0.72)");
+
+  const fileName = page.locator("#file-name");
+  await expect(fileName).toHaveText("demo.html");
+  await expect(fileName).toHaveAttribute("title", artifactPath);
 
   const reviewSwitch = page.locator("#review-switch");
   await expect(reviewSwitch).toHaveAttribute("data-on", "true");

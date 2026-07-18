@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { startReviewServer } from "../src/server.js";
 import { sessionDirFor, writeSessionInfo } from "../src/session.js";
 import { waitForFeedback, renderBatch, WaitError, ReviewConfirmed } from "../src/wait.js";
-import { appendThreadMessage } from "../src/feedback-queue.js";
+import { appendBatch, appendThreadMessage } from "../src/feedback-queue.js";
 
 async function setUp(basePort: number) {
   const dir = mkdtempSync(join(tmpdir(), "ezreview-wait-test-"));
@@ -66,8 +66,23 @@ describe("renderBatch", () => {
     const text = renderBatch([{ id: "a-4", replyToId: "a-3", comment: "but why does the API require it?" }], dir);
     assert.match(text, /\[a-4\]/);
     assert.match(text, /thread a-3/);
+    assert.match(text, /Reply target: a-3/);
     assert.match(text, /why is this here\?/);
     assert.match(text, /because the API requires it/);
+  });
+
+  test("renders a nested follow-up with the durable root id as its reply target", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-renderbatch-nested-followup-test-"));
+    appendBatch(dir, [{ id: "a-root", comment: "root question" }]);
+    appendBatch(dir, [{ id: "a-child", replyToId: "a-root", comment: "first follow-up" }]);
+    const nested = { id: "a-grandchild", replyToId: "a-child", comment: "nested follow-up" };
+    appendBatch(dir, [nested]);
+
+    const text = renderBatch([nested], dir);
+    assert.match(text, /Follow-up on thread a-root/);
+    assert.match(text, /Reply target: a-root/);
+    assert.match(text, /root question/);
+    assert.match(text, /nested follow-up/);
   });
 });
 

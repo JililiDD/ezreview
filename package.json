@@ -1,6 +1,6 @@
 {
   "name": "ezreview",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Local-first human-in-the-loop review of agent-generated HTML artifacts.",
   "license": "MIT",
   "type": "module",

@@ -69,6 +69,27 @@ describe("sendReply", () => {
     }
   });
 
+  test("returns the root thread id when replying with a follow-up child id", async () => {
+    const ctx = await setUp(6115);
+    try {
+      await fetch(new URL("/feedback", ctx.handle.url), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([{ id: "a-root", comment: "question" }]),
+      });
+      await fetch(new URL("/feedback", ctx.handle.url), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([{ id: "a-child", replyToId: "a-root", comment: "follow-up" }]),
+      });
+
+      const replyId = await sendReply(ctx.artifactPath, "a-child", "answer", { sessionRoot: ctx.sessionRoot });
+      assert.equal(replyId, "a-root");
+    } finally {
+      await tearDown(ctx);
+    }
+  });
+
   test("throws ReplyError for an unsubmitted id (400)", async () => {
     const ctx = await setUp(6120);
     try {

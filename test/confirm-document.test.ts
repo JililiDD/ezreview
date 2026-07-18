@@ -24,6 +24,7 @@ describe("POST /confirm-document", () => {
       assert.equal(existsSync(join(sessionDir, "feedback-queue.jsonl")), false);
       assert.equal(existsSync(join(sessionDir, "submitted-ids.jsonl")), false);
       assert.equal(existsSync(join(sessionDir, "threads.jsonl")), false);
+      assert.equal(existsSync(join(sessionDir, "thread-roots.jsonl")), false);
 
       // The response is sent before the server closes, so give the close() a
       // moment to complete rather than asserting synchronously.

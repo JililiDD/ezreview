@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startReviewServer } from "../src/server.js";
-import { appendBatch, consumeNextBatch } from "../src/feedback-queue.js";
+import { appendBatch, consumeNextBatch, loadThreadHistory } from "../src/feedback-queue.js";
 import type { ReviewServerHandle } from "../src/server.js";
 
 async function postFeedback(handle: ReviewServerHandle, items: unknown[]): Promise<Response> {
@@ -26,13 +26,15 @@ async function postReply(handle: ReviewServerHandle, id: string, text: string): 
 describe("POST /reply", () => {
   let dir: string;
   let artifactPath: string;
+  let sessionDir: string;
   let handle: ReviewServerHandle;
 
   before(async () => {
     dir = mkdtempSync(join(tmpdir(), "ezreview-reply-endpoint-test-"));
     artifactPath = join(dir, "demo.html");
+    sessionDir = join(dir, "session");
     writeFileSync(artifactPath, "<html></html>");
-    handle = await startReviewServer({ artifactPath, basePort: 5900, sessionDir: join(dir, "session") });
+    handle = await startReviewServer({ artifactPath, basePort: 5900, sessionDir });
   });
 
   after(async () => {
@@ -72,6 +74,41 @@ describe("POST /reply", () => {
 
     const second = await postReply(handle, "a-2", "second answer, still the same thread");
     assert.equal(second.status, 200);
+  });
+
+  test("replying to a follow-up child id routes the reply and SSE event to the root thread", async () => {
+    await postFeedback(handle, [{ id: "a-thread-root", comment: "root question" }]);
+    await postFeedback(handle, [
+      { id: "a-thread-child", replyToId: "a-thread-root", comment: "follow-up question" },
+    ]);
+
+    const controller = new AbortController();
+    const eventsRes = await fetch(new URL("/events", handle.url), {
+      headers: { Accept: "text/event-stream" },
+      signal: controller.signal,
+    });
+    const reader = eventsRes.body!.getReader();
+    const decoder = new TextDecoder();
+    await reader.read(); // consume ":ok"
+
+    const replyRes = await postReply(handle, "a-thread-child", "answer sent using the child id");
+    assert.equal(replyRes.status, 200);
+
+    const { value } = await reader.read();
+    const chunk = decoder.decode(value);
+    assert.match(chunk, /"id":"a-thread-root"/);
+    assert.doesNotMatch(chunk, /"id":"a-thread-child"/);
+    assert.deepEqual(
+      loadThreadHistory(sessionDir, "a-thread-root").map((message) => [message.from, message.text]),
+      [
+        ["human", "root question"],
+        ["human", "follow-up question"],
+        ["agent", "answer sent using the child id"],
+      ],
+    );
+    assert.deepEqual(loadThreadHistory(sessionDir, "a-thread-child"), []);
+
+    controller.abort();
   });
 
   test("replying to an id that was never submitted is rejected with 400", async () => {
@@ -114,6 +151,47 @@ describe("POST /reply", () => {
       try {
         const res = await postReply(restartedHandle, "a-restart-1", "yes, it does now");
         assert.equal(res.status, 200, `expected 200, got ${res.status}: ${await res.text()}`);
+      } finally {
+        await restartedHandle.close();
+      }
+    } finally {
+      rmSync(restartDir, { recursive: true, force: true });
+    }
+  });
+
+  test("follow-up child routing survives queue consumption and a server restart", async () => {
+    const restartDir = mkdtempSync(join(tmpdir(), "ezreview-child-reply-restart-test-"));
+    const restartArtifact = join(restartDir, "demo.html");
+    writeFileSync(restartArtifact, "<html></html>");
+    const restartSessionDir = join(restartDir, "session");
+
+    try {
+      appendBatch(restartSessionDir, [{ id: "a-restart-root", comment: "root" }]);
+      appendBatch(restartSessionDir, [
+        { id: "a-restart-child", replyToId: "a-restart-root", comment: "follow-up" },
+      ]);
+      consumeNextBatch(restartSessionDir);
+      consumeNextBatch(restartSessionDir);
+
+      const restartedHandle = await startReviewServer({
+        artifactPath: restartArtifact,
+        basePort: 5960,
+        sessionDir: restartSessionDir,
+      });
+      try {
+        const res = await postReply(restartedHandle, "a-restart-child", "answer after restart");
+        const responseBody = await res.text();
+        assert.equal(res.status, 200, `expected 200, got ${res.status}: ${responseBody}`);
+        assert.deepEqual(JSON.parse(responseBody), { ok: true, id: "a-restart-root" });
+        assert.deepEqual(
+          loadThreadHistory(restartSessionDir, "a-restart-root").map((message) => [message.from, message.text]),
+          [
+            ["human", "root"],
+            ["human", "follow-up"],
+            ["agent", "answer after restart"],
+          ],
+        );
+        assert.deepEqual(loadThreadHistory(restartSessionDir, "a-restart-child"), []);
       } finally {
         await restartedHandle.close();
       }

@@ -8,7 +8,7 @@ export interface ReplyOptions {
   sessionRoot?: string;
 }
 
-export async function sendReply(file: string, id: string, text: string, opts: ReplyOptions = {}): Promise<void> {
+export async function sendReply(file: string, id: string, text: string, opts: ReplyOptions = {}): Promise<string> {
   const host = opts.host ?? DEFAULT_HOST;
   const sessionDir = sessionDirFor(file, opts.sessionRoot);
   const info = readSessionInfo(sessionDir);
@@ -33,4 +33,7 @@ export async function sendReply(file: string, id: string, text: string, opts: Re
     const body = (await res.json().catch(() => ({}))) as { error?: string };
     throw new ReplyError(body.error ?? `reply failed with status ${res.status}`);
   }
+
+  const body = (await res.json().catch(() => ({}))) as { id?: string };
+  return body.id ?? id;
 }
