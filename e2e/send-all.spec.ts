@@ -52,16 +52,20 @@ test("Send all submits a real POST /feedback with the queued item's data and tra
 });
 
 test("Send all shows a reply-pending spinner until the agent replies to every submitted item", async ({ page }) => {
-  const { dir, handle } = await startWithFixture("bubble-queue.html", 5805);
+  const { dir, artifactPath, handle } = await startWithFixture("bubble-queue.html", 5805);
   try {
     await page.goto(handle.url);
     const frame = page.frameLocator("#artifact-frame");
     await frame.locator("#near-top").click();
-    await page.locator(".bubble-draft textarea").fill("first question");
+    await page.locator(".bubble-draft textarea").fill("change the date");
     await page.locator(".bubble-draft .bubble-add").click();
     await page.locator("#send-all").click();
     await expect(page.locator(".bubble-sent")).toBeVisible();
 
+    await expect(page.locator("#reply-spinner")).toHaveClass(/visible/);
+
+    writeFileSync(artifactPath, "<html><body><div id=\"near-top\">Changed by agent</div></body></html>");
+    await expect(page.frameLocator("#artifact-frame").locator("#near-top")).toHaveText("Changed by agent");
     await expect(page.locator("#reply-spinner")).toHaveClass(/visible/);
 
     const id = await page.locator(".bubble").getAttribute("data-annotation-id");

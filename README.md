@@ -8,7 +8,7 @@ Local-first review and feedback for HTML documents — built for humans and AI a
 
 - **Click-to-annotate** — comment on any element or text selection directly in the rendered page.
 - **Structured feedback** — each annotation resolves to a stable id, a CSS selector / `outerHTML` (or selected text + surrounding context), and the reviewer's comment.
-- **Question vs. change-request triage** — annotations are handled per-item; agents reply to questions and edit the file for change requests.
+- **Question vs. change-request triage** — annotations are handled per-item; agents answer questions, edit change requests, and reply on the same annotation id when each item is complete.
 - **Live reload** — saved edits to the artifact file are picked up and reflected in the browser automatically.
 - **Multi-round Q&A threads** — reply to an annotation any number of times; the reviewer sees the answer rendered inline, no reload needed.
 - **Idempotent sessions** — calling `open` for a file that already has a running session just returns the existing URL.
@@ -32,12 +32,12 @@ ezreview <your-file>.html
 # 2. Block until the reviewer clicks "Send all" in the browser
 ezreview wait <your-file>.html
 
-# 3. Answer a question-type annotation (leaves the file untouched)
+# 3. Respond to each submitted annotation after handling it
 # `a-3` is the annotation id printed by `wait`, e.g. "a-3: ..."
-ezreview reply <your-file>.html --to a-3 "Explanation goes here."
+ezreview reply <your-file>.html --to a-3 "Updated the date to 08-14."
 ```
 
-Edit the artifact file directly for change-request annotations — the browser refreshes automatically once you save.
+For a change request, edit the artifact first—the browser refreshes automatically once you save—then reply using that annotation's id so the review can close it.
 
 ## CLI reference
 
@@ -59,9 +59,9 @@ Blocks until the reviewer clicks "Submit reviews", then prints one batch of anno
 
 Each annotation includes a stable id (e.g. `a-3`), plus either an element's `selector`/`outerHTML` or a text selection's `selectedText`/`context`, and the reviewer's comment.
 
-### `ezreview reply <file.html> --to <id> "<answer text>"` — answer a question
+### `ezreview reply <file.html> --to <id> "<response text>"` — respond to an annotation
 
-Sends an answer that renders inline in the browser, inside the bubble the question was asked in.
+Sends a response that renders inline in the browser, inside the bubble for that annotation.
 
 - Quote `"<answer text>"` as a single argument — an unquoted answer gets split by the shell and truncated.
 - Supports multiple rounds per thread (the reviewer can keep the conversation going).
@@ -69,17 +69,17 @@ Sends an answer that renders inline in the browser, inside the bubble the questi
 
 Run `ezreview --help` for the full usage summary.
 
-## Workflow: reply vs. edit
+## Workflow: edit and reply
 
-Every annotation is either a **change request** or a **question**:
+Every annotation is either a **change request** or a **question**, and every submitted annotation needs a response:
 
 | Annotation reads like... | Action |
 |---|---|
-| "Make this bigger", "fix the typo", "this color is wrong" | Edit the artifact file at the given `selector`/`outerHTML`/`selectedText` |
+| "Make this bigger", "fix the typo", "this color is wrong" | Edit the artifact file at the given `selector`/`outerHTML`/`selectedText`, then `ezreview reply --to <id> "..."` with what changed |
 | "Why is this here?", "what does this mean?" | `ezreview reply --to <id> "..."` |
-| "Why is this button so tiny?" (a question in form, a fix in intent) | Treat as a change request — fix it, optionally reply noting what changed |
+| "Why is this button so tiny?" (a question in form, a fix in intent) | Treat as a change request — fix it, then reply noting what changed |
 
-Both kinds can appear in the same batch — handle each independently.
+Both kinds can appear in the same batch — handle each independently. For a change request, save the edit before sending the response so the reviewer sees both the updated artifact and the completion message.
 
 ## Writing artifacts that stay Edit-friendly
 

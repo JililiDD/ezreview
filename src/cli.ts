@@ -11,7 +11,7 @@ import { sendReply, ReplyError } from "./reply.js";
 export const USAGE = `Usage:
   ezreview <file.html>                          Open a review server
   ezreview wait <file.html>                      Block until the next feedback batch
-  ezreview reply <file.html> --to <id> "<text>"  Answer a question-type annotation
+  ezreview reply <file.html> --to <id> "<text>"  Respond to a submitted annotation
 
 Options:
   -h, --help    Show this help message

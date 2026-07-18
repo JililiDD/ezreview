@@ -32,26 +32,26 @@ ezreview wait report.html
 - If there is no running session for the file (you haven't called `open` yet, or the server has since auto-exited), `wait` fails immediately with a clear error instead of hanging — run `open` first.
 - Annotation ids and "has this been answered" state are durable — they survive an idle auto-exit + restart, so an id from an old `wait` batch is still valid to `reply` to even if the session restarted in between.
 
-### `ezreview reply <file.html> --to <id> "<answer text>"` — answer a question
+### `ezreview reply <file.html> --to <id> "<response text>"` — respond to an annotation
 
 ```
-ezreview reply report.html --to a-3 "It's the API's required timezone format, not a bug."
+ezreview reply report.html --to a-3 "Updated the date to 08-14."
 ```
 
-- Use this for annotations that are **questions**, not change requests — see the triage rule below.
+- Use this once for **every submitted annotation** after handling it. Questions get an answer; change requests get a concise completion summary after the file is edited.
 - **Always quote `"<answer text>"` as a single shell argument.** The command only reads exactly one argument after `--to <id>` as the answer text — if you pass it unquoted, your shell will split it on whitespace and only the first word is used as the answer, with the rest silently discarded. Quote it exactly like the example above, always, even for short answers.
-- The reviewer sees the answer rendered directly inside the bubble they wrote the question in, in the browser, without needing to reload or re-run `wait`.
+- The reviewer sees the response rendered directly inside the annotation bubble in the browser, without needing to reload or re-run `wait`.
 - **One answer per annotation, ever.** A second `reply --to <same id>` is rejected (non-zero exit, error printed) — there is no follow-up/threaded conversation. If the reviewer wants to say more, they'll create a new annotation with a new id.
 - `reply` does not touch the artifact file at all.
 
-## Deciding: edit the file, or `reply`?
+## Deciding: edit, then reply
 
-Every annotation `wait` gives you is either a **change request** or a **question** — decide per annotation, not per batch (a single batch commonly mixes both):
+Every annotation `wait` gives you is either a **change request** or a **question** — decide per annotation, not per batch (a single batch commonly mixes both). Every item still needs a final `reply`:
 
-- **"Make this bigger", "fix the typo", "this color is wrong", "remove this section"** → it's asking you to change something. Use `Edit` (or equivalent) on the artifact file, targeting the exact `selector`/`outerHTML` or `selectedText` the annotation points at.
+- **"Make this bigger", "fix the typo", "this color is wrong", "remove this section"** → use `Edit` (or equivalent) on the artifact, targeting the exact `selector`/`outerHTML` or `selectedText` it points at, then run `reply --to <id> "..."` describing the completed change.
 - **"Why is this here?", "what does this mean?", "is this intentional?"** → it's asking you something, not asking for a change. Use `reply --to <id>`, and leave the file alone.
-- **Watch for questions that are actually change requests in disguise** — "why is this button so tiny?" or "does this really need to be red?" read grammatically as questions, but the reviewer almost always wants the thing fixed, not an explanation. If a "question" is about something visibly wrong rather than something unclear, treat it as a change request: make the fix, and optionally also `reply` briefly noting what you changed.
-- Both kinds can appear in the same batch — handle each independently. Editing the file and replying to a question are not mutually exclusive within one round.
+- **Watch for questions that are actually change requests in disguise** — "why is this button so tiny?" or "does this really need to be red?" read grammatically as questions, but the reviewer almost always wants the thing fixed, not an explanation. If a "question" is about something visibly wrong rather than something unclear, treat it as a change request: make the fix, then `reply` briefly noting what you changed.
+- Both kinds can appear in the same batch — handle each independently. Do not stop after the file edit: the explicit response is what closes that annotation's review state.
 - If genuinely ambiguous after applying the rule above, prefer treating it as a question and asking for clarification via `reply` rather than guessing at a file change — a wrong guess costs a full round-trip, while a clarifying reply costs nothing.
 
 Once you save an edit, the reviewer's browser refreshes the artifact automatically (you don't need to tell them or restart anything). The shell page itself (toolbar, remaining queued annotations) is unaffected by the refresh.
