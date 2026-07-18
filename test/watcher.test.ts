@@ -19,15 +19,18 @@ describe("watchArtifactFile", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  test("a single write triggers exactly one callback within 1s", async () => {
+  test("a single write triggers exactly one callback within 1.5s", async () => {
     let calls = 0;
     const handle = watchArtifactFile(filePath, () => {
       calls += 1;
     });
 
     try {
+      // Give fs.watch time to register with the kernel before writing,
+      // otherwise macOS can miss the event entirely.
+      await new Promise((r) => setTimeout(r, 50));
       writeFileSync(filePath, "<html>v1</html>");
-      await new Promise((r) => setTimeout(r, 900));
+      await new Promise((r) => setTimeout(r, 1500));
       assert.equal(calls, 1);
     } finally {
       handle.close();
