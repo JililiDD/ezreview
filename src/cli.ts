@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, statSync, realpathSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openInBrowser } from "./browser.js";
@@ -157,7 +157,11 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
 
 function isMainModule(): boolean {
   if (!process.argv[1]) return false;
-  return fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+  try {
+    return fileURLToPath(import.meta.url) === realpathSync(resolve(process.argv[1]));
+  } catch {
+    return false;
+  }
 }
 
 if (isMainModule()) {

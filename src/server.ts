@@ -199,7 +199,7 @@ export function listenOnAvailablePort(
     function tryListen(port: number): void {
       const onError = (err: NodeJS.ErrnoException): void => {
         server.removeListener("listening", onListening);
-        if (err.code === "EADDRINUSE" && attempt < maxAttempts) {
+        if ((err.code === "EADDRINUSE" || err.code === "EACCES" || err.code === "EPERM") && attempt < maxAttempts) {
           attempt += 1;
           tryListen(port + 1);
           return;
