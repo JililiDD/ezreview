@@ -35,6 +35,11 @@ test("shell page shows the dark toolbar and loads the artifact in the iframe", a
 
   const reviewSwitch = page.locator("#review-switch");
   await expect(reviewSwitch).toHaveAttribute("data-on", "true");
+  await expect(page.locator("#scroll-hint")).toHaveCount(0);
+  const toolbarOrder = await page.locator("#theme-toggle, #review-toggle, #confirm-document").evaluateAll((nodes) =>
+    nodes.map((node) => node.id),
+  );
+  expect(toolbarOrder).toEqual(["theme-toggle", "review-toggle", "confirm-document"]);
 
   const frame = page.frameLocator("#artifact-frame");
   await expect(frame.locator("h1")).toHaveText("Demo artifact");

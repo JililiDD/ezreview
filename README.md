@@ -57,7 +57,7 @@ Blocks until the reviewer clicks "Submit reviews", then prints one batch of anno
 - Safe to rerun after a timeout/kill: each batch is consumed exactly once, so a rerun returns the next unconsumed batch — never a duplicate, never a gap.
 - Fails immediately with a clear error if there's no running session for the file (run `open` first).
 
-Each annotation includes a stable id (e.g. `a-3`), plus either an element's `selector`/`outerHTML` or a text selection's `selectedText`/`context`, and the reviewer's comment. Follow-ups also include `Reply target: <root id>`; use that id with `reply`.
+Each annotation includes a stable id (e.g. `a-3`), plus either an element's `selector`/`outerHTML` or a text selection's `selectedText`, nearest element, and local context. Text-selection edits apply only to that exact occurrence, never every identical string in the document. Follow-ups also include `Reply target: <root id>`; use that id with `reply`.
 
 ### `ezreview reply <file.html> --to <id> "<response text>"` — respond to an annotation
 

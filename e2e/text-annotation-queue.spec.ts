@@ -96,6 +96,17 @@ test("Add to queue stores selectedText, context, and nearestSelector correctly",
   expect(item.localContext.after.startsWith(" annotation behavior")).toBe(true);
   expect(item.nearestSelector).toBe("#para");
   expect(item.comment).toBe("check this");
+
+  let requestBody: Array<Record<string, any>> | null = null;
+  page.on("request", (req) => {
+    if (req.url().includes("/feedback") && req.method() === "POST") {
+      requestBody = JSON.parse(req.postData() ?? "[]");
+    }
+  });
+  await page.locator("#send-all").click();
+  await expect(page.locator(".bubble-sent")).toBeVisible();
+  expect(requestBody).not.toBeNull();
+  expect(requestBody![0].localContext).toEqual(item.localContext);
 });
 
 test("context is computed correctly when the selection's container is an element, not a text node", async ({ page }) => {
@@ -178,6 +189,38 @@ test("hovering a queued (not-lost) text annotation deepens its highlight and rev
     return { normal: win.CSS.highlights.get("ai-review-text").size, hover: win.CSS.highlights.get("ai-review-text-hover").size };
   });
   expect(after).toEqual({ normal: 1, hover: 0 });
+});
+
+test("hovering a text comment scrolls a far-away source range into the iframe viewport", async ({ page }) => {
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-hover-scroll-e2e-"));
+  const localArtifact = join(localDir, "demo.html");
+  writeFileSync(
+    localArtifact,
+    '<html><body><p>top</p><div style="height:1600px"></div><p id="far">far confirmation target</p></body></html>',
+  );
+  const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5505 });
+
+  try {
+    await page.goto(localHandle.url);
+    await selectSubstring(page, "#far", "confirmation");
+    await queueCurrentSelection(page, "translate this occurrence");
+    await page.frameLocator("#artifact-frame").locator("body").evaluate((body) => body.ownerDocument!.defaultView!.scrollTo(0, 0));
+
+    await page.locator(".bubble").hover();
+    await page.waitForTimeout(150);
+
+    const position = await page.evaluate(() => {
+      const frame = document.getElementById("artifact-frame") as HTMLIFrameElement;
+      const item = (window as any).__annotationQueue[0];
+      const rect = item.range.getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom, viewportHeight: frame.contentWindow!.innerHeight };
+    });
+    expect(position.top).toBeGreaterThanOrEqual(0);
+    expect(position.bottom).toBeLessThanOrEqual(position.viewportHeight);
+  } finally {
+    await localHandle.close();
+    rmSync(localDir, { recursive: true, force: true });
+  }
 });
 
 test("a text annotation queued before a reload is marked lost after the reload", async ({ page }) => {

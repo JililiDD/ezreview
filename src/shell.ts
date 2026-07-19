@@ -204,17 +204,6 @@ export function renderShellPage(fileName: string, filePath: string): string {
     background: var(--chrome-dim);
     box-shadow: none;
   }
-  #scroll-hint {
-    color: var(--chrome-dim);
-    font-family: ui-monospace, Consolas, monospace;
-    font-size: 12.5px;
-    /* visibility, not display: the review toggle's own position must never
-       shift when this shows/hides — its box stays reserved either way. */
-    visibility: hidden;
-  }
-  #scroll-hint.visible {
-    visibility: visible;
-  }
   #spacer-2 {
     flex: 1;
   }
@@ -454,12 +443,11 @@ export function renderShellPage(fileName: string, filePath: string): string {
     <div id="spacer"></div>
     <span id="file-name" title="${safeFilePath}">${safeFileName}</span>
     <div id="spacer-2"></div>
+    <button id="theme-toggle" title="Toggle light/dark theme">☀︎</button>
     <div id="review-toggle">
       <span>REVIEW MODE</span>
       <span class="switch" id="review-switch" data-on="true"><span class="switch-knob"></span></span>
     </div>
-    <span id="scroll-hint">Scroll while hovering to widen the selection</span>
-    <button id="theme-toggle" title="Toggle light/dark theme">☀︎</button>
     <button id="confirm-document">Approve</button>
   </div>
   <div id="stage">

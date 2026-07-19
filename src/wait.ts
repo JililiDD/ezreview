@@ -20,6 +20,7 @@ export interface AnnotationItem {
   outerHTML?: string;
   selectedText?: string;
   context?: { before: string; after: string };
+  localContext?: { before: string; after: string };
   replyToId?: string;
   [key: string]: unknown;
 }
@@ -43,7 +44,9 @@ export function renderBatch(items: AnnotationItem[], sessionDir: string): string
       }
       const comment = item.comment ?? "";
       if (item.type === "text-annotation") {
-        return `[${item.id}] Selected text: "${item.selectedText}" (before: "${item.context?.before ?? ""}", after: "${item.context?.after ?? ""}", near ${item.nearestSelector ?? "?"}). Comment: ${comment}`;
+        const context = item.localContext ?? item.context;
+        const selector = item.nearestSelector ?? "?";
+        return `[${item.id}] Selected text: "${item.selectedText}"\nNearest element: ${selector}\nLocal context: before "${context?.before ?? ""}", after "${context?.after ?? ""}"\nEdit scope: exact occurrence only inside ${selector}; never replace identical text elsewhere in the document.\nComment: ${comment}`;
       }
       const outer = item.outerHTML ? ` — ${truncate(item.outerHTML, 500)}` : "";
       return `[${item.id}] Element ${item.selector}${outer}. Comment: ${comment}`;

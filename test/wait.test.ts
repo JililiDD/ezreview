@@ -47,6 +47,7 @@ describe("renderBatch", () => {
           type: "text-annotation",
           selectedText: "revenue grew",
           context: { before: "our ", after: " this quarter" },
+          localContext: { before: "local before ", after: " local after" },
           nearestSelector: "#para",
           comment: "double check",
         },
@@ -55,6 +56,9 @@ describe("renderBatch", () => {
     );
     assert.match(text, /\[a-2\]/);
     assert.match(text, /revenue grew/);
+    assert.match(text, /local before/);
+    assert.match(text, /exact occurrence only/i);
+    assert.match(text, /never replace identical text elsewhere/i);
     assert.match(text, /double check/);
   });
 
