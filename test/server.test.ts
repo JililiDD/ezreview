@@ -34,6 +34,22 @@ describe("startReviewServer", () => {
     const body = await res.text();
     assert.match(body, /id="toolbar"/);
     assert.match(body, /id="artifact-frame"/);
+    assert.match(body, /href="\/favicon\.svg"/);
+  });
+
+  test("GET /favicon.svg returns the ezreview favicon", async () => {
+    const res = await fetch(new URL("/favicon.svg", handle.url));
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("content-type"), "image/svg+xml");
+    const body = await res.text();
+    assert.match(body, /aria-label="ezreview"/);
+  });
+
+  test("GET /favicon.ico returns the legacy browser icon", async () => {
+    const res = await fetch(new URL("/favicon.ico", handle.url));
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("content-type"), "image/x-icon");
+    assert.ok((await res.arrayBuffer()).byteLength > 0);
   });
 
   test("GET /artifact returns the original file bytes", async () => {

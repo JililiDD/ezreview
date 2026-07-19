@@ -1,6 +1,7 @@
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse, type Server } from "node:http";
-import { readFileSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { renderShellPage } from "./shell.js";
 import { SseHub } from "./sse.js";
 import { watchArtifactFile } from "./watcher.js";
@@ -17,6 +18,18 @@ import { sessionDirFor } from "./session.js";
 export const DEFAULT_HOST = "127.0.0.1";
 export const BASE_PORT = 4400;
 const MAX_PORT_ATTEMPTS = 50;
+const moduleDir = dirname(fileURLToPath(import.meta.url));
+const sourceAssetsDir = resolve(moduleDir, "../assets");
+const assetsDir = existsSync(sourceAssetsDir) ? sourceAssetsDir : resolve(moduleDir, "../../assets");
+const faviconAssets = new Map([
+  ["/favicon.svg", { file: "favicon.svg", type: "image/svg+xml" }],
+  ["/favicon.ico", { file: "favicon.ico", type: "image/x-icon" }],
+  ["/favicon-16x16.png", { file: "favicon-16x16.png", type: "image/png" }],
+  ["/favicon-32x32.png", { file: "favicon-32x32.png", type: "image/png" }],
+  ["/favicon-64x64.png", { file: "favicon-64x64.png", type: "image/png" }],
+  ["/favicon-192x192.png", { file: "favicon-192x192.png", type: "image/png" }],
+  ["/favicon-512x512.png", { file: "favicon-512x512.png", type: "image/png" }],
+]);
 
 export interface ReviewServerOptions {
   artifactPath: string;
@@ -70,6 +83,22 @@ export function createRequestHandler(
       const body = renderShellPage(basename(absoluteArtifactPath), absoluteArtifactPath);
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end(body);
+      return;
+    }
+
+    const faviconAsset = faviconAssets.get(pathname);
+    if (faviconAsset && req.method === "GET") {
+      try {
+        const body = readFileSync(join(assetsDir, faviconAsset.file));
+        res.writeHead(200, {
+          "Content-Type": faviconAsset.type,
+          "Cache-Control": "public, max-age=86400",
+        });
+        res.end(body);
+      } catch {
+        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("Favicon asset not found");
+      }
       return;
     }
 

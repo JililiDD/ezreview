@@ -16,6 +16,11 @@ export function renderShellPage(fileName: string, filePath: string): string {
 <head>
 <meta charset="utf-8" />
 <title>ezreview</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
+<link rel="icon" href="/favicon-16x16.png" type="image/png" sizes="16x16" />
+<link rel="alternate icon" href="/favicon.ico" />
+<link rel="apple-touch-icon" href="/favicon-192x192.png" sizes="192x192" />
 <style>
   :root[data-theme="dark"] {
     --chrome-bg: rgba(18, 24, 38, 0.72);
