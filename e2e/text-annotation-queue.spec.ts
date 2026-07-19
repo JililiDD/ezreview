@@ -52,6 +52,34 @@ async function selectWholeElement(page: import("@playwright/test").Page, element
   }, elementSelector);
 }
 
+async function selectAcrossTextNodes(
+  page: import("@playwright/test").Page,
+  startSelector: string,
+  startNeedle: string,
+  endSelector: string,
+  endNeedle: string,
+) {
+  await page.evaluate(
+    (args) => {
+      const frame = document.getElementById("artifact-frame") as HTMLIFrameElement;
+      const doc = frame.contentDocument!;
+      const startNode = doc.querySelector(args.startSelector)!.firstChild!;
+      const endNode = doc.querySelector(args.endSelector)!.firstChild!;
+      const start = (startNode.textContent || "").indexOf(args.startNeedle);
+      const end = (endNode.textContent || "").indexOf(args.endNeedle);
+      if (start === -1 || end === -1) throw new Error("selection landmark not found");
+      const range = doc.createRange();
+      range.setStart(startNode, start);
+      range.setEnd(endNode, end + args.endNeedle.length);
+      const selection = doc.getSelection()!;
+      selection.removeAllRanges();
+      selection.addRange(range);
+      doc.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    },
+    { startSelector, startNeedle, endSelector, endNeedle },
+  );
+}
+
 async function queueCurrentSelection(page: import("@playwright/test").Page, comment: string) {
   // Selecting text opens the draft bubble directly now — no intermediate
   // "+ Add comment" button to click first.
@@ -402,6 +430,110 @@ test("a text annotation whose selected text was itself edited re-anchors to the 
       return item.range.toString();
     });
     expect(highlightedText).toBe("CHANGED");
+  } finally {
+    await localHandle.close();
+    rmSync(localDir, { recursive: true, force: true });
+  }
+});
+
+test("a changed selection spanning no-id list items re-anchors from unchanged local context", async ({ page }) => {
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-reanchor-no-id-list-e2e-"));
+  const localArtifact = join(localDir, "demo.html");
+  const originalHtml = `<!doctype html><html><body><main><h2>Design Acceptance Criteria</h2><ul>
+    <li>DAC-001: Before landmark 创建竞赛 remains open.</li>
+    <li>DAC-002: 名称 shows 已有同名的开放竞赛。</li>
+    <li>DAC-003: 竞赛已创建。 After landmark remains unchanged.</li>
+  </ul></main></body></html>`;
+  writeFileSync(localArtifact, originalHtml);
+  const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5555 });
+
+  try {
+    await page.goto(localHandle.url);
+    await selectAcrossTextNodes(
+      page,
+      "li:nth-of-type(1)",
+      "DAC-001:",
+      "li:nth-of-type(3)",
+      "竞赛已创建。",
+    );
+    await queueCurrentSelection(page, "translate highlighted Chinese text");
+
+    writeFileSync(
+      localArtifact,
+      originalHtml
+        .replace("创建竞赛", "Create Competition")
+        .replace("名称", "Name")
+        .replace("已有同名的开放竞赛。", "An open competition with this name already exists.")
+        .replace("竞赛已创建。", "Competition created."),
+    );
+    await page.waitForTimeout(1200);
+
+    const bubble = page.locator(".bubble");
+    await bubble.hover();
+    await expect(bubble.locator(".anchor-lost-badge")).toHaveCount(0);
+    const highlightedText = await page.evaluate(() => (window as any).__annotationQueue[0].range.toString());
+    expect(highlightedText).toContain("Create Competition");
+    expect(highlightedText).toContain("Competition created.");
+  } finally {
+    await localHandle.close();
+    rmSync(localDir, { recursive: true, force: true });
+  }
+});
+
+test("a changed selection ending at a no-id list boundary re-anchors symmetrically", async ({ page }) => {
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-reanchor-no-id-list-end-e2e-"));
+  const localArtifact = join(localDir, "demo.html");
+  const originalHtml = `<!doctype html><html><body><main><ul>
+    <li>Stable before landmark 中文。</li>
+    <li>More selected 中文。</li>
+  </ul></main></body></html>`;
+  writeFileSync(localArtifact, originalHtml);
+  const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5557 });
+
+  try {
+    await page.goto(localHandle.url);
+    await selectAcrossTextNodes(page, "li:nth-of-type(1)", "中文", "li:nth-of-type(2)", "中文。");
+    await queueCurrentSelection(page, "translate through the end boundary");
+
+    writeFileSync(localArtifact, originalHtml.replaceAll("中文", "English"));
+    await page.waitForTimeout(1200);
+
+    const bubble = page.locator(".bubble");
+    await bubble.hover();
+    await expect(bubble.locator(".anchor-lost-badge")).toHaveCount(0);
+    const highlightedText = await page.evaluate(() => (window as any).__annotationQueue[0].range.toString());
+    expect(highlightedText).toContain("English");
+    expect(highlightedText).toContain("More selected English。");
+  } finally {
+    await localHandle.close();
+    rmSync(localDir, { recursive: true, force: true });
+  }
+});
+
+test("a legacy full-document selector still resolves changed selected text", async ({ page }) => {
+  const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-reanchor-legacy-selector-e2e-"));
+  const localArtifact = join(localDir, "demo.html");
+  const originalHtml = "<html><body><main><p>Before landmark 中文 After landmark</p></main></body></html>";
+  writeFileSync(localArtifact, originalHtml);
+  const localHandle = await startReviewServer({ artifactPath: localArtifact, basePort: 5560 });
+
+  try {
+    await page.goto(localHandle.url);
+    await selectSubstring(page, "p", "中文");
+    await queueCurrentSelection(page, "translate this");
+    await page.evaluate(() => {
+      (window as any).__annotationQueue[0].nearestSelector =
+        "html:nth-of-type(1) > body:nth-of-type(1) > main:nth-of-type(1) > p:nth-of-type(1)";
+    });
+
+    writeFileSync(localArtifact, originalHtml.replace("中文", "English"));
+    await page.waitForTimeout(1200);
+
+    const bubble = page.locator(".bubble");
+    await bubble.hover();
+    await expect(bubble.locator(".anchor-lost-badge")).toHaveCount(0);
+    const highlightedText = await page.evaluate(() => (window as any).__annotationQueue[0].range.toString());
+    expect(highlightedText).toBe("English");
   } finally {
     await localHandle.close();
     rmSync(localDir, { recursive: true, force: true });

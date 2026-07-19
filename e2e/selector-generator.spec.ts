@@ -56,6 +56,7 @@ test.describe("selector generator (D-001)", () => {
       await page.goto(handle.url);
       const result = await generateSelectorFor(page, "ul li:nth-of-type(2)");
       expect(result.shadowHost).toBeNull();
+      expect(result.selector).not.toMatch(/^html(?::|\s|>)/);
 
       const match = await page.evaluate((sel) => {
         const frame = document.getElementById("artifact-frame") as HTMLIFrameElement;

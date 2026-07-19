@@ -174,7 +174,7 @@ export function renderClientScript(): string {
     // window's, so a cross-realm instanceof check silently fails here.
     var isShadow = rootNode.nodeType === 11 && !!rootNode.host;
     if (!isShadow) {
-      return { selector: buildPathWithinRoot(el, document), shadowHost: null };
+      return { selector: buildPathWithinRoot(el, el.ownerDocument), shadowHost: null };
     }
     var hostResult = generateSelector(rootNode.host);
     return {
@@ -805,7 +805,8 @@ export function renderClientScript(): string {
   function resolveTextAnnotationScope(item, searchRoot) {
     if (!searchRoot || !item.nearestSelector) return null;
     try {
-      return searchRoot.querySelector(item.nearestSelector);
+      var queryRoot = item.shadowHost ? searchRoot : searchRoot.ownerDocument;
+      return queryRoot && queryRoot.querySelector(item.nearestSelector);
     } catch (e) {
       return null;
     }
@@ -855,6 +856,63 @@ export function renderClientScript(): string {
     return match;
   }
 
+  function captureLocalOffsets(range, scopeRoot) {
+    if (!scopeRoot) return null;
+    try {
+      var beforeRange = range.cloneRange();
+      beforeRange.collapse(true);
+      beforeRange.setStart(scopeRoot, 0);
+      var afterRange = range.cloneRange();
+      afterRange.collapse(false);
+      afterRange.setEnd(scopeRoot, scopeRoot.childNodes.length);
+      return {
+        start: beforeRange.toString().length,
+        endFromScopeEnd: afterRange.toString().length,
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function rangeFromWeakContextBoundary(item, scopeRoot, index) {
+    var offsets = item.localOffsets;
+    var context = item.localContext;
+    if (!offsets || !context) return null;
+    var before = context.before || "";
+    var after = context.after || "";
+    var beforeIsWeak = before.trim() === "";
+    var afterIsWeak = after.trim() === "";
+    var start;
+    var end;
+
+    // An edge selection may have only whitespace on one side. Use its saved
+    // offset only when the opposite landmark is unique and the edge is still
+    // whitespace-only; structural edits must remain lost rather than guessed.
+    if (beforeIsWeak && !afterIsWeak) {
+      end = findUniqueOccurrence(index.text, after);
+      start = offsets.start;
+      if (
+        end === -1 ||
+        index.text.slice(0, start).trim() !== "" ||
+        index.text.slice(Math.max(0, start - before.length), start) !== before
+      ) return null;
+    } else if (afterIsWeak && !beforeIsWeak) {
+      var beforeStart = findUniqueOccurrence(index.text, before);
+      start = beforeStart === -1 ? -1 : beforeStart + before.length;
+      end = index.text.length - offsets.endFromScopeEnd;
+      if (
+        start === -1 ||
+        index.text.slice(end).trim() !== "" ||
+        index.text.slice(end, end + after.length) !== after
+      ) return null;
+    } else {
+      return null;
+    }
+
+    if (start < 0 || end < start || end > index.text.length) return null;
+    return rangeFromOffsets(scopeRoot, index, start, end);
+  }
+
   function tryReanchorTextAnnotation(item) {
     var searchRoot = resolveTextAnnotationRoot(item);
     if (!searchRoot) return null;
@@ -870,6 +928,8 @@ export function renderClientScript(): string {
       if (item.localContext) {
         var gap = findUniqueContextGap(localIndex.text, item.localContext);
         if (gap) return rangeFromOffsets(scopeRoot, localIndex, gap.start, gap.end);
+        var weakBoundaryRange = rangeFromWeakContextBoundary(item, scopeRoot, localIndex);
+        if (weakBoundaryRange) return weakBoundaryRange;
       }
       return null;
     }
@@ -947,6 +1007,7 @@ export function renderClientScript(): string {
         selectedText: draftBubble.selectedText,
         context: draftBubble.context,
         localContext: draftBubble.localContext,
+        localOffsets: draftBubble.localOffsets,
         nearestSelector: draftBubble.nearestSelectorResult.selector,
         shadowHost: draftBubble.nearestSelectorResult.shadowHost,
         comment: comment,
@@ -1126,6 +1187,7 @@ export function renderClientScript(): string {
     var ancestorEl = nearestElementAncestor(range.commonAncestorContainer);
     var context = getTextContext(range);
     var localContext = getTextContextWithin(range, ancestorEl);
+    var localOffsets = captureLocalOffsets(range, ancestorEl);
     var nearestSelectorResult = ancestorEl ? generateSelector(ancestorEl) : { selector: null, shadowHost: null };
 
     if (textHighlightSet) textHighlightSet.add(range);
@@ -1149,6 +1211,7 @@ export function renderClientScript(): string {
       selectedText: selectedText,
       context: context,
       localContext: localContext,
+      localOffsets: localOffsets,
       nearestSelectorResult: nearestSelectorResult,
       textarea: controls.textarea,
     };
