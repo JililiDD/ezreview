@@ -21,7 +21,7 @@ test.afterAll(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-test("hovering a queued bubble highlights its source element and scrolls it into view", async ({ page }) => {
+test("hovering a queued bubble highlights its visible source element", async ({ page }) => {
   await page.goto(handle.url);
   const frame = page.frameLocator("#artifact-frame");
   await frame.locator("#near-top").click();
@@ -59,7 +59,7 @@ test("moving off the bubble hides the highlight", async ({ page }) => {
   await expect(page.locator("#element-highlight")).not.toBeVisible();
 });
 
-test("hovering a bubble that requires scrolling doesn't get its highlight stolen by a stale iframe hover", async ({ page }) => {
+test("hovering a far-away bubble does not scroll, while clicking it scrolls to and highlights its source", async ({ page }) => {
   const localDir = mkdtempSync(join(tmpdir(), "ezreview-hover-linkage-scroll-e2e-"));
   const localArtifact = join(localDir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "hover-linkage-scroll.html"), localArtifact);
@@ -84,10 +84,13 @@ test("hovering a bubble that requires scrolling doesn't get its highlight stolen
     await expect(page.locator("#element-highlight")).toBeVisible();
 
     const bubble = page.locator(".bubble");
+    const scrollBeforeHover = await frame.locator("body").evaluate((body) => body.ownerDocument!.defaultView!.scrollY);
     await bubble.hover();
-    // give the scrollIntoView-triggered native "scroll" event a moment to
-    // propagate to the (now-guarded) refresh listener, if it were going to fire
     await page.waitForTimeout(150);
+    const scrollAfterHover = await frame.locator("body").evaluate((body) => body.ownerDocument!.defaultView!.scrollY);
+    expect(scrollAfterHover).toBe(scrollBeforeHover);
+
+    await bubble.click({ position: { x: 20, y: 20 } });
 
     const highlight = page.locator("#element-highlight");
     await expect(highlight).toBeVisible();

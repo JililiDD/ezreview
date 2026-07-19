@@ -82,6 +82,30 @@ describe("POST /feedback", () => {
     assert.equal(res.status, 400);
   });
 
+  test("an annotation id already persisted in the session is rejected instead of merging threads", async () => {
+    const id = "a-duplicate-regression";
+    const first = await fetch(new URL("/feedback", handle.url), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify([{ id, comment: "first comment" }]),
+    });
+    assert.equal(first.status, 200);
+    consumeNextBatch(sessionDir);
+
+    const duplicate = await fetch(new URL("/feedback", handle.url), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify([{ id, comment: "different comment after reload" }]),
+    });
+    assert.equal(duplicate.status, 409);
+    const body = (await duplicate.json()) as { error: string };
+    assert.match(body.error, /duplicate annotation id/);
+    assert.deepEqual(
+      loadThreadHistory(sessionDir, id).map((message) => message.text),
+      ["first comment"],
+    );
+  });
+
   test("malformed JSON is rejected with 400, not a server crash", async () => {
     const res = await fetch(new URL("/feedback", handle.url), {
       method: "POST",

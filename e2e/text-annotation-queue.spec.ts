@@ -191,7 +191,7 @@ test("hovering a queued (not-lost) text annotation deepens its highlight and rev
   expect(after).toEqual({ normal: 1, hover: 0 });
 });
 
-test("hovering a text comment scrolls a far-away source range into the iframe viewport", async ({ page }) => {
+test("hovering a far-away text comment does not scroll, while clicking it scrolls the source range into view", async ({ page }) => {
   const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-hover-scroll-e2e-"));
   const localArtifact = join(localDir, "demo.html");
   writeFileSync(
@@ -206,8 +206,18 @@ test("hovering a text comment scrolls a far-away source range into the iframe vi
     await queueCurrentSelection(page, "translate this occurrence");
     await page.frameLocator("#artifact-frame").locator("body").evaluate((body) => body.ownerDocument!.defaultView!.scrollTo(0, 0));
 
-    await page.locator(".bubble").hover();
+    const bubble = page.locator(".bubble");
+    const scrollBeforeHover = await page.frameLocator("#artifact-frame").locator("body").evaluate(
+      (body) => body.ownerDocument!.defaultView!.scrollY,
+    );
+    await bubble.hover();
     await page.waitForTimeout(150);
+    const scrollAfterHover = await page.frameLocator("#artifact-frame").locator("body").evaluate(
+      (body) => body.ownerDocument!.defaultView!.scrollY,
+    );
+    expect(scrollAfterHover).toBe(scrollBeforeHover);
+
+    await bubble.click({ position: { x: 20, y: 20 } });
 
     const position = await page.evaluate(() => {
       const frame = document.getElementById("artifact-frame") as HTMLIFrameElement;

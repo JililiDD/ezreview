@@ -407,7 +407,6 @@ export function renderClientScript(): string {
   var queue = [];
   window.__annotationQueue = queue;
   var draftBubble = null;
-  var nextQueueId = 1;
   var sentItems = [];
   window.__sentAnnotations = sentItems;
   // Defensive client-side child -> root lookup. Fixed servers always emit
@@ -418,6 +417,21 @@ export function renderClientScript(): string {
   // thread root) still awaiting at least one reply from the most recent
   // Send all batch. The spinner shows while this is non-empty.
   var pendingReplyIds = {};
+  var annotationPageId = window.crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+  var nextAnnotationNumber = 1;
+
+  function newAnnotationId() {
+    // Annotation ids outlive this page: the server persists thread mappings
+    // across reloads and idle restarts. Namespace the readable counter with
+    // a random per-page token so a reload cannot reuse the previous page's
+    // ids and make a new root inherit an old follow-up's thread mapping.
+    return "a-" + annotationPageId + "-" + nextAnnotationNumber++;
+  }
+
+  function bubbleClickTargetsControl(event) {
+    var target = event.target;
+    return !!(target && target.closest && target.closest("button, textarea, input, select, a"));
+  }
 
   function updateReplySpinner() {
     replySpinner.classList.toggle("visible", Object.keys(pendingReplyIds).length > 0);
@@ -921,7 +935,7 @@ export function renderClientScript(): string {
     node.appendChild(meBlock);
     node.appendChild(deleteBtn);
 
-    var id = "a-" + nextQueueId++;
+    var id = newAnnotationId();
     var item;
     if (draftBubble.type === "text-annotation") {
       item = {
@@ -970,12 +984,15 @@ export function renderClientScript(): string {
           return;
         }
         setAnchorLost(node, false);
-        var anchorEl = nearestElementAncestor(item.range.commonAncestorContainer);
-        if (anchorEl && anchorEl.scrollIntoView) anchorEl.scrollIntoView({ block: "center" });
         if (textHighlightSet && textHighlightHoverSet) {
           textHighlightSet.delete(item.range);
           textHighlightHoverSet.add(item.range);
         }
+      });
+      node.addEventListener("click", function (event) {
+        if (bubbleClickTargetsControl(event) || item.lost) return;
+        var anchorEl = nearestElementAncestor(item.range.commonAncestorContainer);
+        if (anchorEl && anchorEl.scrollIntoView) anchorEl.scrollIntoView({ block: "center" });
       });
       node.addEventListener("mouseleave", function () {
         if (item.lost) return;
@@ -986,14 +1003,10 @@ export function renderClientScript(): string {
       });
     } else {
       node.addEventListener("mouseenter", function () {
-        // Defensive: if the iframe's own scroll-triggered highlight refresh
-        // still holds a stale currentHoverTarget when scrollIntoView below
-        // causes a real scroll, don't let it clobber this highlight.
         currentHoverTarget = null;
         var el = resolveAnnotationElement(item);
         if (el) {
           setAnchorLost(node, false);
-          if (el.scrollIntoView) el.scrollIntoView({ block: "center" });
           positionHighlight(el);
         } else {
           setAnchorLost(node, true);
@@ -1002,6 +1015,19 @@ export function renderClientScript(): string {
       });
       node.addEventListener("mouseleave", function () {
         hideHighlight();
+      });
+      node.addEventListener("click", function (event) {
+        if (bubbleClickTargetsControl(event)) return;
+        currentHoverTarget = null;
+        var el = resolveAnnotationElement(item);
+        if (!el) {
+          setAnchorLost(node, true);
+          hideHighlight();
+          return;
+        }
+        setAnchorLost(node, false);
+        if (el.scrollIntoView) el.scrollIntoView({ block: "center" });
+        positionHighlight(el);
       });
     }
 
@@ -1234,7 +1260,7 @@ export function renderClientScript(): string {
   }
 
   function queueFollowUp(rootId, text, node) {
-    var id = "a-" + nextQueueId++;
+    var id = newAnnotationId();
     threadRootById[id] = rootId;
     var item = {
       id: id,

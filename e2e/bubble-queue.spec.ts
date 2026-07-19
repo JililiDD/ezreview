@@ -101,6 +101,25 @@ test("Add to queue transitions the bubble to queue state and increments the coun
   await expect(page.locator("#send-all")).toHaveText("Submit review (1)");
 });
 
+test("annotation ids are not reused after the review page reloads", async ({ page }) => {
+  await page.goto(handle.url);
+  const frame = page.frameLocator("#artifact-frame");
+  await frame.locator("#near-top").click();
+  await page.locator(".bubble-draft textarea").fill("before reload");
+  await page.locator(".bubble-draft .bubble-add").click();
+  const firstId = await page.locator(".bubble").getAttribute("data-annotation-id");
+
+  await page.reload();
+  await frame.locator("#near-top").click();
+  await page.locator(".bubble-draft textarea").fill("after reload");
+  await page.locator(".bubble-draft .bubble-add").click();
+  const secondId = await page.locator(".bubble").getAttribute("data-annotation-id");
+
+  expect(firstId).not.toBeNull();
+  expect(secondId).not.toBeNull();
+  expect(secondId).not.toBe(firstId);
+});
+
 test("Delete removes a queued bubble and decrements the count", async ({ page }) => {
   await page.goto(handle.url);
   const frame = page.frameLocator("#artifact-frame");

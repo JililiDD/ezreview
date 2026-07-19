@@ -118,6 +118,20 @@ export function createRequestHandler(
             res.end(JSON.stringify({ error: "expected an array of annotation items, each with an id" }));
             return;
           }
+          const batchIds = (body as Array<{ id: unknown }>).map((item) => String(item.id));
+          const idsSeenInBatch = new Set<string>();
+          const duplicateId = batchIds.find((id) => {
+            if (submittedIds.has(id) || idsSeenInBatch.has(id)) {
+              return true;
+            }
+            idsSeenInBatch.add(id);
+            return false;
+          });
+          if (duplicateId) {
+            res.writeHead(409, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ error: `duplicate annotation id: ${duplicateId}` }));
+            return;
+          }
           const unknownReplyTo = (body as Array<{ replyToId?: unknown }>).find(
             (item) => item.replyToId != null && !submittedIds.has(String(item.replyToId)),
           );
