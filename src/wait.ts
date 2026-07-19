@@ -29,6 +29,10 @@ function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
+function requiredReply(id: string): string {
+  return `Required reply: ${id}. After handling this annotation, run the ezreview reply command for this id and confirm it succeeds. An artifact reload is not a reply.`;
+}
+
 // sessionDir is required (not optional-with-a-degraded-fallback): the only
 // production caller always has one, and a follow-up item silently rendered
 // without its thread history would be a real bug, not a reasonable default.
@@ -40,16 +44,18 @@ export function renderBatch(items: AnnotationItem[], sessionDir: string): string
         const rootId = threadRoots.get(item.id) ?? threadRoots.get(item.replyToId) ?? item.replyToId;
         const history = loadThreadHistory(sessionDir, rootId);
         const historyText = history.map((m) => `  [${m.from}] ${m.text}`).join("\n");
-        return `[${item.id}] Follow-up on thread ${rootId}\nReply target: ${rootId}\nFull history:\n${historyText}`;
+        return `[${item.id}] Follow-up on thread ${rootId}\nReply target: ${rootId}\nFull history:\n${historyText}\n${requiredReply(rootId)}`;
       }
       const comment = item.comment ?? "";
       if (item.type === "text-annotation") {
         const context = item.localContext ?? item.context;
         const selector = item.nearestSelector ?? "?";
-        return `[${item.id}] Selected text: "${item.selectedText}"\nNearest element: ${selector}\nLocal context: before "${context?.before ?? ""}", after "${context?.after ?? ""}"\nEdit scope: exact occurrence only inside ${selector}; never replace identical text elsewhere in the document.\nComment: ${comment}`;
+        const before = context?.before ?? "";
+        const after = context?.after ?? "";
+        return `[${item.id}] Selected text: "${item.selectedText}"\nNearest element: ${selector}\nLocal context: before (${before.length} characters) "${before}", after (${after.length} characters) "${after}"\nEdit scope: exact occurrence only inside ${selector}; never replace identical text elsewhere in the document.\nEdit boundary: the highlighted selected text is a hard edit boundary; do not modify anything outside the highlight.\nMinimal change: follow the comment literally. If it names a specific word, token, or phrase, change only that text inside the highlight and preserve every other character unless the comment explicitly requests more. Do not translate, rename, normalize, or rewrite adjacent text.\nComment: ${comment}\n${requiredReply(item.id)}`;
       }
       const outer = item.outerHTML ? ` — ${truncate(item.outerHTML, 500)}` : "";
-      return `[${item.id}] Element ${item.selector}${outer}. Comment: ${comment}`;
+      return `[${item.id}] Element ${item.selector}${outer}. Comment: ${comment}\n${requiredReply(item.id)}`;
     })
     .join("\n");
 }

@@ -40,7 +40,7 @@ Keep `ezreview wait <file.html>` attached to the current agent execution. Do not
 
 1. Handle every annotation in the batch.
 2. Edit the artifact for change requests.
-3. Run `ezreview reply` once for every annotation id.
+3. Run `ezreview reply` once for every annotation id and verify that each command exits successfully. Editing the artifact or triggering its automatic reload never counts as a reply.
 4. Start a fresh attached `ezreview wait <file.html>`.
 
 Continue this loop until `wait` reports that the review was confirmed complete, the human confirms in chat, or an unrecoverable error occurs. A command timeout or no output is not review completion; resume the same managed command session when possible, or start a fresh attached `wait`.
@@ -62,10 +62,10 @@ ezreview reply report.html --to a-3 "Updated the date to 08-14."
 Every annotation `wait` gives you is either a **change request** or a **question** — decide per annotation, not per batch (a single batch commonly mixes both). Every item still needs a final `reply`:
 
 - **"Make this bigger", "fix the typo", "this color is wrong", "remove this section"** → use `Edit` (or equivalent) on the artifact, targeting the exact `selector`/`outerHTML` or `selectedText` it points at, then run `reply --to <id> "..."` describing the completed change.
-- **A text-selection change request is scoped to that exact occurrence only.** Use its `nearestSelector` and local before/after context to identify the selected occurrence. Never run a document-wide replacement merely because the same selected text appears elsewhere; if the occurrence cannot be identified uniquely, ask for clarification instead of editing every match.
+- **A text-selection change request has a hard highlight boundary.** Use its `nearestSelector` and local before/after context to identify the selected occurrence. Do not modify anything outside the highlighted selection. Inside the selection, follow the comment literally: if it names one word, token, or phrase, change only that named text and preserve every other character unless the reviewer explicitly requests a broader rewrite. Never translate, rename, normalize, or rewrite adjacent text, and never run a document-wide replacement merely because the same text appears elsewhere. If the occurrence cannot be identified uniquely, ask for clarification via `reply` instead of editing multiple matches.
 - **"Why is this here?", "what does this mean?", "is this intentional?"** → it's asking you something, not asking for a change. Use `reply --to <id>`, and leave the file alone.
 - **Watch for questions that are actually change requests in disguise** — "why is this button so tiny?" or "does this really need to be red?" read grammatically as questions, but the reviewer almost always wants the thing fixed, not an explanation. If a "question" is about something visibly wrong rather than something unclear, treat it as a change request: make the fix, then `reply` briefly noting what you changed.
-- Both kinds can appear in the same batch — handle each independently. Do not stop after the file edit: the explicit response is what closes that annotation's review state.
+- Both kinds can appear in the same batch — handle each independently. Do not stop after the file edit or automatic artifact reload: the explicit, successfully completed `reply` command is what closes that annotation's waiting state. Never claim that a comment was replied to unless that command succeeded.
 - If genuinely ambiguous after applying the rule above, prefer treating it as a question and asking for clarification via `reply` rather than guessing at a file change — a wrong guess costs a full round-trip, while a clarifying reply costs nothing.
 
 Once you save an edit, the reviewer's browser refreshes the artifact automatically (you don't need to tell them or restart anything). The shell page itself (toolbar, remaining queued annotations) is unaffected by the refresh.

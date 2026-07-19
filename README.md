@@ -57,13 +57,13 @@ Blocks until the reviewer clicks "Submit review", then prints one batch of annot
 - Safe to rerun after a timeout/kill: each batch is consumed exactly once, so a rerun returns the next unconsumed batch — never a duplicate, never a gap.
 - Fails immediately with a clear error if there's no running session for the file (run `ezreview <file.html>` first).
 
-Each annotation includes a stable id (e.g. `a-3`), plus either an element's `selector`/`outerHTML` or a text selection's `selectedText`, nearest element, and local context. Text-selection edits apply only to that exact occurrence, never every identical string in the document. Follow-ups also include `Reply target: <root id>`; use that id with `reply`.
+Each annotation includes a stable id (e.g. `a-3`), plus either an element's `selector`/`outerHTML` or a text selection's `selectedText`, nearest element, and local context. A text selection is a hard edit boundary: do not edit outside it, and if the comment names one word/token/phrase, change only that named text inside the selection. Follow-ups also include `Reply target: <root id>`; use that id with `reply`.
 
 ## For agents: keep the review loop attached
 
 Use your host's managed background-task mechanism to keep the review server open, like any long-running dev server. Keep `ezreview wait <file.html>` attached to the current agent execution so the submitted batch returns to the agent. Do not run `wait` with plain shell detachment such as `&`, `nohup`, or `disown`.
 
-`wait` returns one feedback batch, then exits. After each batch, handle every annotation, send one `ezreview reply` for every annotation id, then start a fresh attached `wait`. Continue until `wait` reports that the reviewer approved the document, the human confirms in chat, or an unrecoverable error occurs. A command timeout or no output is not review completion; rerun attached `wait` to keep listening.
+`wait` returns one feedback batch, then exits. After each batch, handle every annotation, send one successful `ezreview reply` for every annotation id, then start a fresh attached `wait`. An artifact edit or automatic reload is not a reply. Continue until `wait` reports that the reviewer approved the document, the human confirms in chat, or an unrecoverable error occurs. A command timeout or no output is not review completion; rerun attached `wait` to keep listening.
 
 ### `ezreview reply <file.html> --to <id> "<response text>"` — respond to an annotation
 

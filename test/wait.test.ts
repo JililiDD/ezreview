@@ -59,7 +59,36 @@ describe("renderBatch", () => {
     assert.match(text, /local before/);
     assert.match(text, /exact occurrence only/i);
     assert.match(text, /never replace identical text elsewhere/i);
+    assert.match(text, /hard edit boundary/i);
+    assert.match(text, /do not modify anything outside the highlight/i);
+    assert.match(text, /specific word, token, or phrase/i);
+    assert.match(text, /preserve every other character/i);
+    assert.match(text, /before \(13 characters\)/i);
+    assert.match(text, /after \(12 characters\)/i);
+    assert.match(text, /Required reply: a-2/i);
+    assert.match(text, /artifact reload is not a reply/i);
     assert.match(text, /double check/);
+  });
+
+  test("requires a successful reply for every annotation in a mixed batch", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ezreview-renderbatch-replies-test-"));
+    const text = renderBatch(
+      [
+        { id: "a-element", type: "element-annotation", selector: "#x", comment: "fix this" },
+        {
+          id: "a-text",
+          type: "text-annotation",
+          selectedText: "Competition",
+          localContext: { before: "before ", after: " after" },
+          nearestSelector: "#design",
+          comment: "translate this word",
+        },
+      ],
+      dir,
+    );
+
+    assert.match(text, /Required reply: a-element/);
+    assert.match(text, /Required reply: a-text/);
   });
 
   test("renders a follow-up item (replyToId set) as its thread's full history, not just its own comment", () => {
@@ -73,6 +102,7 @@ describe("renderBatch", () => {
     assert.match(text, /Reply target: a-3/);
     assert.match(text, /why is this here\?/);
     assert.match(text, /because the API requires it/);
+    assert.match(text, /Required reply: a-3/);
   });
 
   test("renders a nested follow-up with the durable root id as its reply target", () => {
