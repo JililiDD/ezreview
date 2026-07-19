@@ -19,15 +19,15 @@ async function cleanup(dir: string, handle: ReviewServerHandle) {
   rmSync(dir, { recursive: true, force: true });
 }
 
-test("Confirm document sits in the toolbar's former Send all slot; Send all now lives in the rail footer", async ({
+test("Confirm document sits in the toolbar's former Submit review slot; Submit review now lives in the rail footer", async ({
   page,
 }) => {
   const { dir, handle } = await startWithFixture("bubble-queue.html", 6300);
   try {
     await page.goto(handle.url);
 
-    await expect(page.locator("#toolbar #confirm-document")).toHaveText("Approve");
-    await expect(page.locator("#rail-footer #send-all")).toHaveText("Submit review (0)");
+    await expect(page.locator("#toolbar #approve")).toHaveText("Approve");
+    await expect(page.locator("#rail-footer #submit-review")).toHaveText("Submit review (0)");
   } finally {
     await cleanup(dir, handle);
   }
@@ -44,7 +44,7 @@ test("clicking Confirm document while the queue is non-empty is blocked with a s
     await page.locator(".bubble-draft textarea").fill("x");
     await page.locator(".bubble-draft .bubble-add").click();
 
-    await page.locator("#confirm-document").click();
+    await page.locator("#approve").click();
     await expect(page.locator("#status-text")).toHaveText("Send or clear the queue first");
     await expect(page.locator("#confirm-modal-backdrop")).not.toHaveClass(/visible/);
   } finally {
@@ -62,28 +62,28 @@ test("clicking Confirm document with an empty queue shows a custom confirm modal
     await frame.locator("#near-top").click();
     await page.locator(".bubble-draft textarea").fill("why is this here?");
     await page.locator(".bubble-draft .bubble-add").click();
-    await page.locator("#send-all").click();
+    await page.locator("#submit-review").click();
     await expect(page.locator(".bubble-sent")).toBeVisible();
 
     expect(existsSync(join(sessionDir, "threads.jsonl"))).toBe(true);
 
-    await page.locator("#confirm-document").click();
+    await page.locator("#approve").click();
     await expect(page.locator("#confirm-modal-backdrop")).toHaveClass(/visible/);
     await expect(page.locator("#confirm-modal")).toContainText("All feedback history will be deleted");
 
     await page.locator("#confirm-modal-ok").click();
     await expect(page.locator("#confirm-modal-backdrop")).not.toHaveClass(/visible/);
 
-    await expect(page.locator("#confirm-document")).toHaveText("Confirmed");
-    await expect(page.locator("#confirm-document")).toBeDisabled();
-    await expect(page.locator("#send-all")).toBeDisabled();
+    await expect(page.locator("#approve")).toHaveText("Confirmed");
+    await expect(page.locator("#approve")).toBeDisabled();
+    await expect(page.locator("#submit-review")).toBeDisabled();
     await expect(page.locator("#status-dot")).toHaveClass(/disconnected/, { timeout: 3000 });
     expect(existsSync(join(sessionDir, "threads.jsonl"))).toBe(false);
     expect(existsSync(join(sessionDir, "feedback-queue.jsonl"))).toBe(false);
     expect(existsSync(join(sessionDir, "submitted-ids.jsonl"))).toBe(false);
     expect(existsSync(join(sessionDir, "thread-roots.jsonl"))).toBe(false);
 
-    await expect(page.locator("#review-switch")).toHaveAttribute("data-on", "false");
+    await expect(page.locator("#review-mode-switch")).toHaveAttribute("data-on", "false");
   } finally {
     await cleanup(dir, handle);
   }
@@ -93,14 +93,14 @@ test("Cancel on the confirm modal leaves the document editable", async ({ page }
   const { dir, handle } = await startWithFixture("bubble-queue.html", 6321);
   try {
     await page.goto(handle.url);
-    await page.locator("#confirm-document").click();
+    await page.locator("#approve").click();
     await expect(page.locator("#confirm-modal-backdrop")).toHaveClass(/visible/);
 
     await page.locator("#confirm-modal-cancel").click();
     await expect(page.locator("#confirm-modal-backdrop")).not.toHaveClass(/visible/);
-    await expect(page.locator("#confirm-document")).toHaveText("Approve");
-    await expect(page.locator("#confirm-document")).toBeEnabled();
-    await expect(page.locator("#send-all")).toBeEnabled();
+    await expect(page.locator("#approve")).toHaveText("Approve");
+    await expect(page.locator("#approve")).toBeEnabled();
+    await expect(page.locator("#submit-review")).toBeDisabled();
   } finally {
     await cleanup(dir, handle);
   }

@@ -6,7 +6,7 @@ import { startReviewServer } from "../src/server.ts";
 import type { ReviewServerHandle } from "../src/server.ts";
 
 async function startWithFixture(fixtureName: string, basePort: number) {
-  const dir = mkdtempSync(join(tmpdir(), "ezreview-send-all-e2e-"));
+  const dir = mkdtempSync(join(tmpdir(), "ezreview-submit-review-e2e-"));
   const artifactPath = join(dir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", fixtureName), artifactPath);
   const handle = await startReviewServer({ artifactPath, basePort });
@@ -18,14 +18,16 @@ async function cleanup(dir: string, handle: ReviewServerHandle) {
   rmSync(dir, { recursive: true, force: true });
 }
 
-test("Send all submits a real POST /feedback with the queued item's data and transitions to Sent", async ({ page }) => {
+test("Submit review submits a real POST /feedback with the queued item's data and transitions to Sent", async ({ page }) => {
   const { dir, handle } = await startWithFixture("bubble-queue.html", 5800);
   try {
     await page.goto(handle.url);
+    await expect(page.locator("#submit-review")).toBeDisabled();
     const frame = page.frameLocator("#artifact-frame");
     await frame.locator("#near-top").click();
     await page.locator(".bubble-draft textarea").fill("too light");
     await page.locator(".bubble-draft .bubble-add").click();
+    await expect(page.locator("#submit-review")).toBeEnabled();
 
     let requestBody: unknown = null;
     page.on("request", (req) => {
@@ -34,7 +36,7 @@ test("Send all submits a real POST /feedback with the queued item's data and tra
       }
     });
 
-    await page.locator("#send-all").click();
+    await page.locator("#submit-review").click();
     await expect(page.locator(".bubble-sent")).toBeVisible();
 
     expect(requestBody).not.toBeNull();
@@ -45,13 +47,14 @@ test("Send all submits a real POST /feedback with the queued item's data and tra
     expect(typeof body[0].selector).toBe("string");
 
     await expect(page.locator(".bubble .bubble-delete")).toHaveCount(0);
-    await expect(page.locator("#send-all")).toHaveText("Submit review (0)");
+    await expect(page.locator("#submit-review")).toHaveText("Submit review (0)");
+    await expect(page.locator("#submit-review")).toBeDisabled();
   } finally {
     await cleanup(dir, handle);
   }
 });
 
-test("Send all shows a reply-pending spinner until the agent replies to every submitted item", async ({ page }) => {
+test("Submit review shows a reply-pending spinner until the agent replies to every submitted item", async ({ page }) => {
   const { dir, artifactPath, handle } = await startWithFixture("bubble-queue.html", 5805);
   try {
     await page.goto(handle.url);
@@ -59,7 +62,7 @@ test("Send all shows a reply-pending spinner until the agent replies to every su
     await frame.locator("#near-top").click();
     await page.locator(".bubble-draft textarea").fill("change the date");
     await page.locator(".bubble-draft .bubble-add").click();
-    await page.locator("#send-all").click();
+    await page.locator("#submit-review").click();
     await expect(page.locator(".bubble-sent")).toBeVisible();
 
     await expect(page.locator("#reply-spinner")).toHaveClass(/visible/);
@@ -101,7 +104,7 @@ test("a sent element-annotation includes outerHTML truncated to 500 characters",
         requestBody = JSON.parse(req.postData() ?? "[]");
       }
     });
-    await page.locator("#send-all").click();
+    await page.locator("#submit-review").click();
     await expect(page.locator(".bubble-sent")).toBeVisible();
 
     expect(requestBody).not.toBeNull();
@@ -121,7 +124,7 @@ test("sent bubbles stay directly in the rail across a reload, not moved into any
     await frame.locator("#near-top").click();
     await page.locator(".bubble-draft textarea").fill("x");
     await page.locator(".bubble-draft .bubble-add").click();
-    await page.locator("#send-all").click();
+    await page.locator("#submit-review").click();
     await expect(page.locator(".bubble-sent")).toBeVisible();
 
     writeFileSync(artifactPath, "<html><body><div id=\"near-top\">A</div><div id=\"near-top-2\">B</div></body></html>");
@@ -141,7 +144,7 @@ test("hover linkage still works on a sent element-annotation bubble (regression)
     await frame.locator("#near-top").click();
     await page.locator(".bubble-draft textarea").fill("x");
     await page.locator(".bubble-draft .bubble-add").click();
-    await page.locator("#send-all").click();
+    await page.locator("#submit-review").click();
     await expect(page.locator(".bubble-sent")).toBeVisible();
 
     await page.locator(".bubble-sent").hover();
@@ -167,7 +170,7 @@ test("a sent bubble keeps its stacking slot: a newly queued bubble near the same
     await frame.locator("#near-top").click();
     await page.locator(".bubble-draft textarea").fill("first");
     await page.locator(".bubble-draft .bubble-add").click();
-    await page.locator("#send-all").click();
+    await page.locator("#submit-review").click();
     await expect(page.locator(".bubble-sent")).toBeVisible();
 
     // no reload happened — the sent bubble must still occupy its stacking
@@ -201,12 +204,12 @@ test("a failed submission (non-ok response) surfaces an error and leaves the que
     await page.locator(".bubble-draft textarea").fill("x");
     await page.locator(".bubble-draft .bubble-add").click();
 
-    await page.locator("#send-all").click();
+    await page.locator("#submit-review").click();
 
     await expect(page.locator("#status-text")).toHaveText("Send failed — please retry");
     await expect(page.locator(".bubble-sent")).toHaveCount(0);
     await expect(page.locator(".bubble .bubble-delete")).toHaveCount(1);
-    await expect(page.locator("#send-all")).toHaveText("Submit review (1)");
+    await expect(page.locator("#submit-review")).toHaveText("Submit review (1)");
   } finally {
     await cleanup(dir, handle);
   }
@@ -223,11 +226,11 @@ test("a network-level failure (fetch rejects) also surfaces an error and leaves 
     await page.locator(".bubble-draft textarea").fill("x");
     await page.locator(".bubble-draft .bubble-add").click();
 
-    await page.locator("#send-all").click();
+    await page.locator("#submit-review").click();
 
     await expect(page.locator("#status-text")).toHaveText("Send failed — network error");
     await expect(page.locator(".bubble-sent")).toHaveCount(0);
-    await expect(page.locator("#send-all")).toHaveText("Submit review (1)");
+    await expect(page.locator("#submit-review")).toHaveText("Submit review (1)");
   } finally {
     await cleanup(dir, handle);
   }

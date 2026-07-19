@@ -103,7 +103,7 @@ test("Add to queue stores selectedText, context, and nearestSelector correctly",
       requestBody = JSON.parse(req.postData() ?? "[]");
     }
   });
-  await page.locator("#send-all").click();
+  await page.locator("#submit-review").click();
   await expect(page.locator(".bubble-sent")).toBeVisible();
   expect(requestBody).not.toBeNull();
   expect(requestBody![0].localContext).toEqual(item.localContext);
@@ -258,7 +258,7 @@ test("a text annotation queued before a reload is marked lost after the reload",
 
 test("a text annotation that was already Sent before a reload is also marked lost on hover (not silently inert)", async ({ page }) => {
   // Regression: markTextAnnotationsLost() previously only scanned the queue,
-  // so a text annotation already moved into sentItems by Send all kept
+  // so a text annotation already moved into sentItems by Submit review kept
   // lost === false forever. Its Range still pointed at the pre-reload
   // iframe document, so hovering it neither highlighted anything (the
   // Range's nodes are gone) nor showed the Anchor lost badge — a silent,
@@ -273,7 +273,7 @@ test("a text annotation that was already Sent before a reload is also marked los
     await selectSubstring(page, "#para", "testing text selection");
     await queueCurrentSelection(page, "x");
 
-    await page.locator("#send-all").click();
+    await page.locator("#submit-review").click();
     await expect(page.locator(".bubble.bubble-sent")).toBeVisible();
 
     writeFileSync(localArtifact, "<html><body><p>totally different</p></body></html>");

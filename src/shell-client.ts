@@ -4,14 +4,14 @@ export function renderClientScript(): string {
   var dot = document.getElementById("status-dot");
   var statusText = document.getElementById("status-text");
   var frame = document.getElementById("artifact-frame");
-  var reviewSwitch = document.getElementById("review-switch");
+  var reviewSwitch = document.getElementById("review-mode-switch");
   var commentRail = document.getElementById("comment-rail");
   var railScroll = document.getElementById("rail-scroll");
   var railGrip = document.getElementById("rail-grip");
   var railCollapseBtn = document.getElementById("rail-collapse");
   var railCollapseAllBtn = document.getElementById("rail-collapse-all");
   var railFooter = document.getElementById("rail-footer");
-  var confirmDocumentButton = document.getElementById("confirm-document");
+  var approveButton = document.getElementById("approve");
   var confirmModalBackdrop = document.getElementById("confirm-modal-backdrop");
   var confirmModalOk = document.getElementById("confirm-modal-ok");
   var confirmModalCancel = document.getElementById("confirm-modal-cancel");
@@ -400,9 +400,9 @@ export function renderClientScript(): string {
     railGrip.releasePointerCapture(e.pointerId);
   });
 
-  // ---- Bubble queue (draft -> queue -> delete; Send all is a placeholder) ----
+  // ---- Bubble queue (draft -> queue -> delete; Submit review is a placeholder) ----
 
-  var sendAllButton = document.getElementById("send-all");
+  var submitReviewButton = document.getElementById("submit-review");
   var replySpinner = document.getElementById("reply-spinner");
   var queue = [];
   window.__annotationQueue = queue;
@@ -415,7 +415,7 @@ export function renderClientScript(): string {
   var threadRootById = {};
   // Root ids (never a follow-up's own id — replies always target the
   // thread root) still awaiting at least one reply from the most recent
-  // Send all batch. The spinner shows while this is non-empty.
+  // Submit review batch. The spinner shows while this is non-empty.
   var pendingReplyIds = {};
   var annotationPageId = window.crypto.randomUUID().replace(/-/g, "").slice(0, 16);
   var nextAnnotationNumber = 1;
@@ -437,8 +437,9 @@ export function renderClientScript(): string {
     replySpinner.classList.toggle("visible", Object.keys(pendingReplyIds).length > 0);
   }
 
-  function updateSendAllLabel() {
-    sendAllButton.textContent = "Submit review (" + queue.length + ")";
+  function updateSubmitReviewLabel() {
+    submitReviewButton.textContent = "Submit review (" + queue.length + ")";
+    if (!documentReadOnly) submitReviewButton.disabled = queue.length === 0;
   }
 
   function targetAnchorY(target) {
@@ -684,7 +685,7 @@ export function renderClientScript(): string {
     var addBtn = document.createElement("button");
     addBtn.className = "bubble-add";
     addBtn.textContent = "Add";
-    // Same look as the toolbar's Send all button (var(--accent) fill).
+    // Same look as the toolbar's Submit review button (var(--accent) fill).
     addBtn.style.background = "var(--accent)";
     addBtn.style.color = "var(--accent-ink)";
     addBtn.style.border = "none";
@@ -1032,7 +1033,7 @@ export function renderClientScript(): string {
     }
 
     draftBubble = null;
-    updateSendAllLabel();
+    updateSubmitReviewLabel();
     layoutBubbles();
   }
 
@@ -1047,7 +1048,7 @@ export function renderClientScript(): string {
     if (idx === -1) return;
     queue[idx].node.remove();
     queue.splice(idx, 1);
-    updateSendAllLabel();
+    updateSubmitReviewLabel();
     layoutBubbles();
   }
 
@@ -1271,7 +1272,7 @@ export function renderClientScript(): string {
     };
     queue.push(item);
     appendFollowUpToThread(node, text);
-    updateSendAllLabel();
+    updateSubmitReviewLabel();
   }
 
   // Collapsing a sent bubble hides everything except the original "ME"
@@ -1335,7 +1336,7 @@ export function renderClientScript(): string {
     }, 3000);
   }
 
-  sendAllButton.addEventListener("click", function () {
+  submitReviewButton.addEventListener("click", function () {
     if (queue.length === 0) return;
     var payload = buildSubmissionPayload();
     fetch("/feedback", {
@@ -1362,7 +1363,7 @@ export function renderClientScript(): string {
           sentItems.push(item);
         }
         queue.length = 0;
-        updateSendAllLabel();
+        updateSubmitReviewLabel();
         updateReplySpinner();
         layoutBubbles();
       })
@@ -1374,9 +1375,9 @@ export function renderClientScript(): string {
   function enterReadOnlyMode() {
     documentReadOnly = true;
     documentConfirmed = true;
-    confirmDocumentButton.disabled = true;
-    confirmDocumentButton.textContent = "Confirmed";
-    sendAllButton.disabled = true;
+    approveButton.disabled = true;
+    approveButton.textContent = "Confirmed";
+    submitReviewButton.disabled = true;
     if (reviewOn) {
       reviewOn = false;
       reviewSwitch.setAttribute("data-on", "false");
@@ -1387,7 +1388,7 @@ export function renderClientScript(): string {
     reviewSwitch.style.opacity = "0.5";
   }
 
-  confirmDocumentButton.addEventListener("click", function () {
+  approveButton.addEventListener("click", function () {
     if (queue.length > 0) {
       showSendFailure("Send or clear the queue first");
       return;

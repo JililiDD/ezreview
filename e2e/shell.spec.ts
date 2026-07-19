@@ -28,18 +28,22 @@ test("shell page shows the dark toolbar and loads the artifact in the iframe", a
   await expect(toolbar).toBeVisible();
   await expect(toolbar).toHaveCSS("height", "48px");
   await expect(toolbar).toHaveCSS("background-color", "rgba(18, 24, 38, 0.72)");
+  await expect(page.locator("#wordmark")).toHaveText("ezreview");
+  await expect(page.locator("#wordmark")).toHaveCSS("color", "rgb(78, 230, 196)");
+  await expect(page.locator("#wordmark-logo")).toBeVisible();
+  await expect(page.locator("#wordmark-logo")).toHaveAttribute("src", "/favicon.svg");
 
   const fileName = page.locator("#file-name");
   await expect(fileName).toHaveText("demo.html");
   await expect(fileName).toHaveAttribute("title", artifactPath);
 
-  const reviewSwitch = page.locator("#review-switch");
+  const reviewSwitch = page.locator("#review-mode-switch");
   await expect(reviewSwitch).toHaveAttribute("data-on", "true");
   await expect(page.locator("#scroll-hint")).toHaveCount(0);
-  const toolbarOrder = await page.locator("#theme-toggle, #review-toggle, #confirm-document").evaluateAll((nodes) =>
+  const toolbarOrder = await page.locator("#theme-toggle, #review-mode, #approve").evaluateAll((nodes) =>
     nodes.map((node) => node.id),
   );
-  expect(toolbarOrder).toEqual(["theme-toggle", "review-toggle", "confirm-document"]);
+  expect(toolbarOrder).toEqual(["theme-toggle", "review-mode", "approve"]);
 
   const frame = page.frameLocator("#artifact-frame");
   await expect(frame.locator("h1")).toHaveText("Demo artifact");
@@ -53,7 +57,7 @@ test("modifying the artifact reloads only the iframe, not the shell", async ({ p
 
   try {
     await page.goto(localHandle.url);
-    const reviewSwitch = page.locator("#review-switch");
+    const reviewSwitch = page.locator("#review-mode-switch");
     await expect(reviewSwitch).toHaveAttribute("data-on", "true");
 
     writeFileSync(artifactPath, "<html><body><h1>v1</h1></body></html>");

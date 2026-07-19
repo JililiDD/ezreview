@@ -70,8 +70,8 @@ test("Review on: highlight follows scroll inside the iframe", async ({ page }) =
 
 test("Review off: no highlight and no listener interference", async ({ page }) => {
   await page.goto(handle.url);
-  await page.locator("#review-switch").click();
-  await expect(page.locator("#review-switch")).toHaveAttribute("data-on", "false");
+  await page.locator("#review-mode-switch").click();
+  await expect(page.locator("#review-mode-switch")).toHaveAttribute("data-on", "false");
 
   const frame = page.frameLocator("#artifact-frame");
   await frame.locator("#target-a").hover();

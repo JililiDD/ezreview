@@ -81,7 +81,7 @@ test("Cancel discards the draft without touching the queue", async ({ page }) =>
   await draft.locator(".bubble-cancel").click();
 
   await expect(page.locator(".bubble-draft")).toHaveCount(0);
-  await expect(page.locator("#send-all")).toHaveText("Submit review (0)");
+  await expect(page.locator("#submit-review")).toHaveText("Submit review (0)");
 });
 
 test("Add to queue transitions the bubble to queue state and increments the count", async ({ page }) => {
@@ -98,7 +98,7 @@ test("Add to queue transitions the bubble to queue state and increments the coun
   await expect(queued).toHaveCount(1);
   await expect(queued.locator(".bubble-comment")).toHaveText("too light");
   await expect(queued.locator(".bubble-delete")).toBeVisible();
-  await expect(page.locator("#send-all")).toHaveText("Submit review (1)");
+  await expect(page.locator("#submit-review")).toHaveText("Submit review (1)");
 });
 
 test("annotation ids are not reused after the review page reloads", async ({ page }) => {
@@ -126,12 +126,12 @@ test("Delete removes a queued bubble and decrements the count", async ({ page })
   await frame.locator("#near-top").click();
   await page.locator(".bubble-draft textarea").fill("x");
   await page.locator(".bubble-draft .bubble-add").click();
-  await expect(page.locator("#send-all")).toHaveText("Submit review (1)");
+  await expect(page.locator("#submit-review")).toHaveText("Submit review (1)");
 
   await page.locator(".bubble .bubble-delete").click();
 
   await expect(page.locator(".bubble")).toHaveCount(0);
-  await expect(page.locator("#send-all")).toHaveText("Submit review (0)");
+  await expect(page.locator("#submit-review")).toHaveText("Submit review (0)");
 });
 
 test("two queued bubbles with close anchors stack without overlapping", async ({ page }) => {
@@ -159,20 +159,20 @@ test("two queued bubbles with close anchors stack without overlapping", async ({
   expect(noOverlap).toBe(true);
 });
 
-test("clicking Send all with an empty queue does not submit anything (edge case)", async ({ page }) => {
+test("clicking Submit review with an empty queue does not submit anything (edge case)", async ({ page }) => {
   await page.goto(handle.url);
+  await expect(page.locator("#submit-review")).toBeDisabled();
 
   let feedbackRequestSeen = false;
   page.on("request", (req) => {
     if (req.url().includes("/feedback")) feedbackRequestSeen = true;
   });
 
-  await page.locator("#send-all").click();
   await page.waitForTimeout(200);
 
   expect(feedbackRequestSeen).toBe(false);
 });
 
-// Real Send-all submission + Sent/History bubble states are covered in
-// e2e/send-all.spec.ts (Phase 5) — this file stays focused on the
+// Real Submit review submission + Sent/History bubble states are covered in
+// e2e/submit-review.spec.ts (Phase 5) — this file stays focused on the
 // draft->queue->delete mechanics established in Phase 3.

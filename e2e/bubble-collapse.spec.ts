@@ -23,7 +23,7 @@ async function queueAndSend(page: import("@playwright/test").Page, comment: stri
   await frame.locator("#near-top").click();
   await page.locator(".bubble-draft textarea").fill(comment);
   await page.locator(".bubble-draft .bubble-add").click();
-  await page.locator("#send-all").click();
+  await page.locator("#submit-review").click();
   await expect(page.locator(".bubble-sent")).toBeVisible();
 }
 
@@ -73,7 +73,7 @@ test("the rail-wide collapse-all button collapses every sent bubble, and toggles
     await frame.locator("#near-top-2").click();
     await page.locator(".bubble-draft textarea").fill("second");
     await page.locator(".bubble-draft .bubble-add").click();
-    await page.locator("#send-all").click();
+    await page.locator("#submit-review").click();
     await expect(page.locator(".bubble-sent")).toHaveCount(2);
 
     await page.locator("#rail-collapse-all").click();

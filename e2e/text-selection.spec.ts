@@ -37,7 +37,7 @@ test.afterAll(async () => {
 
 test("selecting text opens the draft comment bubble directly, Review on", async ({ page }) => {
   await page.goto(handle.url);
-  await expect(page.locator("#review-switch")).toHaveAttribute("data-on", "true");
+  await expect(page.locator("#review-mode-switch")).toHaveAttribute("data-on", "true");
 
   await selectWholeElementText(page, "#mid-span");
 
@@ -47,8 +47,8 @@ test("selecting text opens the draft comment bubble directly, Review on", async 
 
 test("selecting text does not open a draft comment bubble when Review is off", async ({ page }) => {
   await page.goto(handle.url);
-  await page.locator("#review-switch").click();
-  await expect(page.locator("#review-switch")).toHaveAttribute("data-on", "false");
+  await page.locator("#review-mode-switch").click();
+  await expect(page.locator("#review-mode-switch")).toHaveAttribute("data-on", "false");
 
   await selectWholeElementText(page, "#mid-span");
 
@@ -57,11 +57,11 @@ test("selecting text does not open a draft comment bubble when Review is off", a
 
 test("re-enabling Review restores the ability to open a draft via text selection", async ({ page }) => {
   await page.goto(handle.url);
-  await page.locator("#review-switch").click();
-  await expect(page.locator("#review-switch")).toHaveAttribute("data-on", "false");
+  await page.locator("#review-mode-switch").click();
+  await expect(page.locator("#review-mode-switch")).toHaveAttribute("data-on", "false");
 
-  await page.locator("#review-switch").click();
-  await expect(page.locator("#review-switch")).toHaveAttribute("data-on", "true");
+  await page.locator("#review-mode-switch").click();
+  await expect(page.locator("#review-mode-switch")).toHaveAttribute("data-on", "true");
 
   await selectWholeElementText(page, "#mid-span");
 

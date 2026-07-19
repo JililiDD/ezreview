@@ -23,7 +23,7 @@ async function queueAndSend(page: import("@playwright/test").Page, comment: stri
   await frame.locator("#near-top").click();
   await page.locator(".bubble-draft textarea").fill(comment);
   await page.locator(".bubble-draft .bubble-add").click();
-  await page.locator("#send-all").click();
+  await page.locator("#submit-review").click();
   await expect(page.locator(".bubble-sent")).toBeVisible();
 }
 
@@ -85,7 +85,7 @@ test("an agent reply renders inside the same bubble with an AGENT label, and a f
   }
 });
 
-test("submitting a follow-up via the persistent input queues it and threads it after Send all", async ({ page }) => {
+test("submitting a follow-up via the persistent input queues it and threads it after Submit review", async ({ page }) => {
   const { dir, handle } = await startWithFixture("bubble-queue.html", 6205);
   try {
     await page.goto(handle.url);
@@ -96,14 +96,14 @@ test("submitting a follow-up via the persistent input queues it and threads it a
     await bubble.locator(".followup-controls textarea").fill("still unclear, can you say more?");
     await bubble.locator(".followup-controls .bubble-add").click();
 
-    // The follow-up renders immediately inside the thread, and Send all's
+    // The follow-up renders immediately inside the thread, and Submit review's
     // counter reflects it as a queued item awaiting submission.
     await expect(bubble.locator(".bubble-thread .bubble-comment")).toHaveText("still unclear, can you say more?");
     await expect(bubble.locator(".bubble-thread .me-label")).toHaveText("ME");
-    await expect(page.locator("#send-all")).toHaveText("Submit review (1)");
+    await expect(page.locator("#submit-review")).toHaveText("Submit review (1)");
 
-    await page.locator("#send-all").click();
-    await expect(page.locator("#send-all")).toHaveText("Submit review (0)");
+    await page.locator("#submit-review").click();
+    await expect(page.locator("#submit-review")).toHaveText("Submit review (0)");
   } finally {
     await cleanup(dir, handle);
   }
@@ -123,7 +123,7 @@ test("replying with a follow-up child id renders the answer in its root bubble",
       const queue = (window as unknown as { __annotationQueue: Array<{ id: string }> }).__annotationQueue;
       return queue[0].id;
     });
-    await page.locator("#send-all").click();
+    await page.locator("#submit-review").click();
 
     const res = await fetch(new URL("/reply", handle.url), {
       method: "POST",

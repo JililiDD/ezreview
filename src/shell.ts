@@ -123,13 +123,23 @@ export function renderShellPage(fileName: string, filePath: string): string {
     position: relative;
   }
   #wordmark {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-weight: 700;
     font-size: 12px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--chrome-dim);
+    color: var(--accent);
     border-right: 1px solid var(--chrome-border);
     padding-right: 14px;
+  }
+  #wordmark-logo {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    display: block;
+    filter: drop-shadow(0 0 8px var(--accent-soft));
   }
   #file-status {
     display: flex;
@@ -170,7 +180,7 @@ export function renderShellPage(fileName: string, filePath: string): string {
   #spacer {
     flex: 1;
   }
-  #review-toggle {
+  #review-mode {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -229,7 +239,7 @@ export function renderShellPage(fileName: string, filePath: string): string {
     color: var(--chrome-fg);
     border-color: var(--accent);
   }
-  #confirm-document {
+  #approve {
     background: transparent;
     color: var(--accent);
     border: 1px solid var(--accent);
@@ -240,16 +250,16 @@ export function renderShellPage(fileName: string, filePath: string): string {
     cursor: pointer;
     letter-spacing: 0.03em;
   }
-  #confirm-document:hover {
+  #approve:hover {
     background: var(--accent-soft);
   }
-  #confirm-document:disabled {
+  #approve:disabled {
     background: transparent;
     color: var(--chrome-dim);
     border-color: var(--chrome-border);
     cursor: default;
   }
-  #send-all {
+  #submit-review {
     background: var(--accent);
     color: var(--accent-ink);
     border: none;
@@ -258,11 +268,32 @@ export function renderShellPage(fileName: string, filePath: string): string {
     font-weight: 700;
     font-size: 15px;
     cursor: pointer;
+    transform: translateY(0) scale(1);
+    box-shadow: 0 0 0 rgba(78, 230, 196, 0);
+    transition:
+      background-color 0.16s ease,
+      box-shadow 0.16s ease,
+      color 0.16s ease,
+      transform 0.12s ease;
   }
-  #send-all:disabled {
+  #submit-review:not(:disabled):hover {
+    box-shadow: 0 10px 22px -14px var(--accent), 0 0 0 3px var(--accent-soft);
+    transform: translateY(-1px);
+  }
+  #submit-review:not(:disabled):active {
+    box-shadow: 0 4px 12px -10px var(--accent), 0 0 0 2px var(--accent-soft);
+    transform: translateY(0) scale(0.98);
+  }
+  #submit-review:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  #submit-review:disabled {
     background: var(--chrome-border);
     color: var(--chrome-dim);
     cursor: default;
+    box-shadow: none;
+    transform: none;
   }
   #stage {
     flex: 1;
@@ -362,7 +393,7 @@ export function renderShellPage(fileName: string, filePath: string): string {
     display: flex;
     align-items: center;
   }
-  #rail-footer #send-all {
+  #rail-footer #submit-review {
     width: 100%;
   }
   #reply-spinner {
@@ -439,7 +470,7 @@ export function renderShellPage(fileName: string, filePath: string): string {
 </head>
 <body>
   <div id="toolbar">
-    <span id="wordmark">ezreview</span>
+    <span id="wordmark"><img id="wordmark-logo" src="/favicon.svg" alt="" aria-hidden="true" />ezreview</span>
     <div id="file-status">
       <span id="status-dot"></span>
       <span id="agent-status">Agent connected</span>
@@ -449,11 +480,11 @@ export function renderShellPage(fileName: string, filePath: string): string {
     <span id="file-name" title="${safeFilePath}">${safeFileName}</span>
     <div id="spacer-2"></div>
     <button id="theme-toggle" title="Toggle light/dark theme">☀︎</button>
-    <div id="review-toggle">
+    <div id="review-mode">
       <span>REVIEW MODE</span>
-      <span class="switch" id="review-switch" data-on="true"><span class="switch-knob"></span></span>
+      <span class="switch" id="review-mode-switch" data-on="true"><span class="switch-knob"></span></span>
     </div>
-    <button id="confirm-document">Approve</button>
+    <button id="approve">Approve</button>
   </div>
   <div id="stage">
     <div id="artifact-pane">
@@ -466,7 +497,7 @@ export function renderShellPage(fileName: string, filePath: string): string {
       <div id="rail-scroll"></div>
       <div id="rail-footer">
         <span id="reply-spinner" title="Waiting for the agent to reply"></span>
-        <button id="send-all">Submit review (0)</button>
+        <button id="submit-review" disabled>Submit review (0)</button>
       </div>
     </div>
   </div>
