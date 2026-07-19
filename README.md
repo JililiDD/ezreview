@@ -11,7 +11,7 @@ Local-first review and feedback for HTML documents — built for humans and AI a
 - **Question vs. change-request triage** — annotations are handled per-item; agents answer questions, edit change requests, and reply on the same annotation id when each item is complete.
 - **Live reload** — saved edits to the artifact file are picked up and reflected in the browser automatically.
 - **Multi-round Q&A threads** — reply to an annotation any number of times; the reviewer sees the answer rendered inline, no reload needed.
-- **Idempotent sessions** — calling `open` for a file that already has a running session just returns the existing URL.
+- **Idempotent sessions** — running `ezreview <file.html>` for a file that already has a running session just returns the existing URL.
 - **Durable queue** — feedback batches and annotation ids survive process restarts and idle auto-exit; a killed `wait` can simply be rerun.
 - **Local-only** — the server binds to `127.0.0.1`; nothing leaves your machine.
 
@@ -29,7 +29,7 @@ Requires Node.js >= 20.
 # 1. Open the document for review — starts a local server and opens your browser
 ezreview <your-file>.html
 
-# 2. Block until the reviewer clicks "Send all" in the browser
+# 2. Block until the reviewer clicks "Submit review" in the browser
 ezreview wait <your-file>.html
 
 # 3. Respond to each submitted annotation after handling it
@@ -51,13 +51,19 @@ Starts a local server, opens the artifact in the reviewer's browser, and prints 
 
 ### `ezreview wait <file.html>` — block until the next feedback batch
 
-Blocks until the reviewer clicks "Submit reviews", then prints one batch of annotations as structured text and exits 0.
+Blocks until the reviewer clicks "Submit review", then prints one batch of annotations as structured text and exits 0.
 
 - If a batch was already sent before `wait` was called, it returns immediately — nothing is lost by calling late.
 - Safe to rerun after a timeout/kill: each batch is consumed exactly once, so a rerun returns the next unconsumed batch — never a duplicate, never a gap.
-- Fails immediately with a clear error if there's no running session for the file (run `open` first).
+- Fails immediately with a clear error if there's no running session for the file (run `ezreview <file.html>` first).
 
 Each annotation includes a stable id (e.g. `a-3`), plus either an element's `selector`/`outerHTML` or a text selection's `selectedText`, nearest element, and local context. Text-selection edits apply only to that exact occurrence, never every identical string in the document. Follow-ups also include `Reply target: <root id>`; use that id with `reply`.
+
+## For agents: keep the review loop attached
+
+Use your host's managed background-task mechanism to keep the review server open, like any long-running dev server. Keep `ezreview wait <file.html>` attached to the current agent execution so the submitted batch returns to the agent. Do not run `wait` with plain shell detachment such as `&`, `nohup`, or `disown`.
+
+`wait` returns one feedback batch, then exits. After each batch, handle every annotation, send one `ezreview reply` for every annotation id, then start a fresh attached `wait`. Continue until `wait` reports that the reviewer approved the document, the human confirms in chat, or an unrecoverable error occurs. A command timeout or no output is not review completion; rerun attached `wait` to keep listening.
 
 ### `ezreview reply <file.html> --to <id> "<response text>"` — respond to an annotation
 
@@ -93,7 +99,7 @@ To keep feedback precise enough to act on directly:
 
 ## How it works
 
-`ezreview open` starts a local HTTP server that serves a review "shell" page embedding the artifact, plus a comment rail for annotations. Feedback batches are appended to a durable, per-session queue on disk (keyed by the artifact's absolute path), so `wait`/`reply` state survives idle restarts. Server-Sent Events push live reload, new replies, and session-confirmation signals to the browser without polling.
+`ezreview <file.html>` starts a local HTTP server that serves a review "shell" page embedding the artifact, plus a comment rail for annotations. Feedback batches are appended to a durable, per-session queue on disk (keyed by the artifact's absolute path), so `wait`/`reply` state survives idle restarts. Server-Sent Events push live reload, new replies, and session-confirmation signals to the browser without polling. A connected browser tab or blocked `wait` call keeps the session active and prevents idle auto-exit.
 
 ## Development
 

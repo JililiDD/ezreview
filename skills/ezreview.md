@@ -14,10 +14,10 @@ Starts a local server, opens the artifact in the reviewer's browser, and prints 
 ezreview report.html
 ```
 
-- **It is a foreground process.** It does not return until you kill it (Ctrl+C) or the server auto-exits after 1 hour with no client connected (neither a browser tab nor a blocked `wait` call). Because of this, launch it with your host's background-task mechanism (the same way you'd launch any long-running dev server) rather than waiting on it synchronously.
-- **It is idempotent — call it as many times as you want.** If a server for this exact file is already running, running `open` again just prints the existing URL and exits immediately (exit 0); it never starts a second instance. There is no need to check "is a server already running for this file" before calling it — just call it.
+- **It is a foreground process.** It does not return until you kill it (Ctrl+C) or the server auto-exits after 1 hour with no client connected (neither a browser tab nor a blocked `wait` call). Because of this, launch it with your host's managed background-task mechanism, the same way you'd launch any long-running dev server, rather than waiting on it synchronously.
+- **It is idempotent — call it as many times as you want.** If a server for this exact file is already running, running `ezreview <file.html>` again just prints the existing URL and exits immediately (exit 0); it never starts a second instance. There is no need to check "is a server already running for this file" before calling it — just call it.
 - It binds to `127.0.0.1` only (no LAN/remote access).
-- If `<file.html>` doesn't exist, all three commands (`open`, `wait`, `reply`) fail the same way: an `Error: File not found: <path>` message on stderr and a non-zero exit — check the path if you see this.
+- If `<file.html>` doesn't exist, all three commands (`ezreview <file.html>`, `wait`, `reply`) fail the same way: an `Error: File not found: <path>` message on stderr and a non-zero exit — check the path if you see this.
 
 ### `ezreview wait <file.html>` — block until the next batch of feedback
 
@@ -25,12 +25,25 @@ ezreview report.html
 ezreview wait report.html
 ```
 
-- Blocks until the reviewer clicks "Send all" in the browser, then prints one batch of annotations as structured, readable text to stdout and exits 0.
+- Blocks until the reviewer clicks "Submit review" in the browser, then prints one batch of annotations as structured, readable text to stdout and exits 0.
 - **If a batch was already sent before you called `wait`, you still get it immediately** — nothing is lost by calling `wait` late.
-- **If your shell/host kills `wait` due to a command timeout, just run it again.** Feedback is durably queued server-side and consumed exactly once per `wait` call; a killed-and-rerun `wait` will still return the next unconsumed batch, never a duplicate and never a gap. Do not build your own retry/backoff logic around this — a plain rerun is the correct and complete recovery.
+- **If your shell/host kills `wait` due to a command timeout, run it again attached to the agent execution.** Feedback is durably queued server-side and consumed exactly once per `wait` call; a killed-and-rerun `wait` will still return the next unconsumed batch, never a duplicate and never a gap. Do not build custom queue recovery logic; a plain rerun is the correct recovery.
 - Each annotation in the output has a stable id (e.g. `a-3`), an element `selector` and (truncated) `outerHTML` for element annotations, or `selectedText`/surrounding `context` for text-selection annotations, and the reviewer's `comment`. For a follow-up, `wait` also prints `Reply target: <root id>`; use that root id when replying.
-- If there is no running session for the file (you haven't called `open` yet, or the server has since auto-exited), `wait` fails immediately with a clear error instead of hanging — run `open` first.
+- If there is no running session for the file (you haven't run `ezreview <file.html>` yet, or the server has since auto-exited), `wait` fails immediately with a clear error instead of hanging — run `ezreview <file.html>` first.
 - Annotation ids and "has this been answered" state are durable — they survive an idle auto-exit + restart, so an id from an old `wait` batch is still valid to `reply` to even if the session restarted in between.
+
+## Keep the agent actively waiting
+
+Keep `ezreview wait <file.html>` attached to the current agent execution. Do not run `wait` with `&`, `nohup`, `disown`, or any plain detached shell mechanism. If your host exposes a managed long-running tool call or resumable command session, keep and reuse that handle until it returns.
+
+`wait` returns one feedback batch, then exits. After it returns:
+
+1. Handle every annotation in the batch.
+2. Edit the artifact for change requests.
+3. Run `ezreview reply` once for every annotation id.
+4. Start a fresh attached `ezreview wait <file.html>`.
+
+Continue this loop until `wait` reports that the review was confirmed complete, the human confirms in chat, or an unrecoverable error occurs. A command timeout or no output is not review completion; resume the same managed command session when possible, or start a fresh attached `wait`.
 
 ### `ezreview reply <file.html> --to <id> "<response text>"` — respond to an annotation
 
