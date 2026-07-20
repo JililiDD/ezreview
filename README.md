@@ -105,10 +105,13 @@ To keep feedback precise enough to act on directly:
 
 ```
 npm install
-npm run build        # compile TypeScript to dist/
-npm test              # run the unit/integration test suite
-npm run test:browser  # run Playwright end-to-end tests
+npm run build             # compile TypeScript to dist/
+npm run build:standalone  # create dist/ezreview.mjs
+npm test                  # run the unit/integration test suite
+npm run test:browser      # run Playwright end-to-end tests
 ```
+
+`dist/ezreview.mjs` is a self-contained Node.js CLI bundle. It can be copied by itself to another directory or vendored into another project; runtime JavaScript modules and favicon assets are embedded, while Node.js built-in modules remain normal external imports.
 
 Project layout:
 

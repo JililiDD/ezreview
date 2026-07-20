@@ -1,6 +1,6 @@
 {
   "name": "ezreview",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Local-first human-in-the-loop review of agent-generated HTML artifacts.",
   "license": "MIT",
   "type": "module",
@@ -16,14 +16,16 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:standalone": "node scripts/build-standalone.mjs",
     "build:favicons": "node scripts/generate-favicons.mjs && sips -s format ico assets/favicon-32x32.png --out assets/favicon.ico",
-    "test": "node --test dist/test/**/*.test.js",
+    "test": "npm run build:standalone && node --test dist/test/**/*.test.js",
     "test:browser": "playwright test",
     "prepublishOnly": "npm run build && npm test"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0",
     "@types/node": "^22.10.0",
+    "esbuild": "^0.28.1",
     "typescript": "^5.7.0"
   }
 }
