@@ -20,13 +20,7 @@ It also works as a standalone command-line interface (CLI) for any local HTML fi
 
 ## See it in action
 
-Click the image below to watch a short end-to-end review:
-
-<p align="center">
-  <a href="./demo/EZREVIEW_Demo.mp4">
-    <img src="./demo/EZREVIEW_Title_v2.svg" alt="Watch the EZREVIEW demo" width="640">
-  </a>
-</p>
+https://github.com/user-attachments/assets/b41d2b23-2067-420f-8d03-aa555ef824c7
 
 In the demo, the reviewer selects content in the browser, submits feedback, and sees the agent's edit and reply in the same review session.
 
