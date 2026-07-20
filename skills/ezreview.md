@@ -1,8 +1,16 @@
-# ezreview — agent usage guide
+# ezreview agent usage guide
 
 `ezreview` closes the loop between an agent that writes HTML artifacts and a human who reviews them in a browser. The human annotates the rendered artifact directly (clicking elements, selecting text); the agent reads those annotations back as structured, Edit-ready text and either edits the file or answers a question.
 
 This document assumes no prior knowledge of the tool beyond what's written here.
+
+## AIPilot and standalone operation
+
+`ezreview` can run as AIPilot's browser review runtime or as a standalone tool with any AI agent. Both modes use the same persistent review loop.
+
+When using `ezreview` without AIPilot, treat a request to keep reviewing as a terminal condition for the current turn. Keep the server session running, keep an attached `wait` active, handle and reply to every returned annotation, then wait again. Do not finish after one feedback batch, a file reload, empty output, or a command timeout.
+
+End the loop only when the reviewer clicks **Approve**, explicitly confirms completion in chat, or an unrecoverable error prevents further review. A browser tab closing does not confirm completion.
 
 ## The three commands
 
