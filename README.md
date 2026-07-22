@@ -20,7 +20,7 @@ It also works as a standalone command-line interface (CLI) for any local HTML fi
 
 ## See it in action
 
-https://github.com/user-attachments/assets/3329665e-a1fd-45a0-b1cb-0149b233bab7
+https://github.com/user-attachments/assets/f0a7700b-70dd-41da-8b16-f2aa0bdc6f56
 
 In the demo, the reviewer selects content in the browser, submits feedback, and sees the agent's edit and reply in the same review session.
 
