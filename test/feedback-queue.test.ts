@@ -1,6 +1,6 @@
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -10,6 +10,7 @@ import {
   appendThreadMessage,
   loadThreadHistory,
   loadThreadRoots,
+  resetSessionFiles,
 } from "../src/feedback-queue.js";
 
 describe("feedback-queue", () => {
@@ -71,6 +72,45 @@ describe("feedback-queue", () => {
   test("loadSubmittedIds returns an empty set when no file exists yet", () => {
     const sessionDir = join(dir, "no-ids-file-yet");
     assert.deepEqual(loadSubmittedIds(sessionDir), new Set());
+  });
+
+  test("resetSessionFiles ignores missing paths and paths that are not real directories", () => {
+    const missingPath = join(dir, "reset-missing");
+    const ordinaryFile = join(dir, "reset-ordinary-file");
+    writeFileSync(ordinaryFile, "keep me");
+
+    assert.doesNotThrow(() => resetSessionFiles(missingPath));
+    assert.doesNotThrow(() => resetSessionFiles(ordinaryFile));
+    assert.equal(readFileSync(ordinaryFile, "utf-8"), "keep me");
+  });
+
+  test("resetSessionFiles never follows a top-level session-directory symlink", () => {
+    const targetDir = join(dir, "reset-symlink-target");
+    const sessionLink = join(dir, "reset-symlink");
+    mkdirSync(targetDir);
+    writeFileSync(join(targetDir, "session.json"), "keep me");
+    symlinkSync(targetDir, sessionLink, process.platform === "win32" ? "junction" : "dir");
+
+    resetSessionFiles(sessionLink);
+
+    assert.equal(readFileSync(join(targetDir, "session.json"), "utf-8"), "keep me");
+    assert.equal(existsSync(sessionLink), true);
+  });
+
+  test("resetSessionFiles deletes owned outputs but preserves unknown entries", () => {
+    const sessionDir = join(dir, "reset-with-unknown-entry");
+    appendBatch(sessionDir, [{ id: "a-1", comment: "question" }]);
+    writeFileSync(join(sessionDir, "session.json"), "{}");
+    writeFileSync(join(sessionDir, "keep.txt"), "unrelated");
+
+    resetSessionFiles(sessionDir);
+
+    assert.equal(existsSync(join(sessionDir, "feedback-queue.jsonl")), false);
+    assert.equal(existsSync(join(sessionDir, "submitted-ids.jsonl")), false);
+    assert.equal(existsSync(join(sessionDir, "threads.jsonl")), false);
+    assert.equal(existsSync(join(sessionDir, "thread-roots.jsonl")), false);
+    assert.equal(existsSync(join(sessionDir, "session.json")), false);
+    assert.equal(readFileSync(join(sessionDir, "keep.txt"), "utf-8"), "unrelated");
   });
 
   test("appendBatch records the original comment as the first human message in that id's thread", () => {

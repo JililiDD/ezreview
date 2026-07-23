@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startReviewServer } from "../src/server.js";
 import { appendBatch } from "../src/feedback-queue.js";
+import { writeSessionInfo } from "../src/session.js";
 
 describe("POST /confirm-document", () => {
   test("deletes all persisted session files and shuts down the server", async () => {
@@ -14,6 +15,8 @@ describe("POST /confirm-document", () => {
     const sessionDir = join(dir, "session");
 
     appendBatch(sessionDir, [{ id: "a-1", comment: "why is this here?" }]);
+    writeSessionInfo(sessionDir, { port: 5980, pid: process.pid, file: artifactPath });
+    writeFileSync(join(sessionDir, "feedback-queue.jsonl.123.tmp"), "interrupted output");
 
     const handle = await startReviewServer({ artifactPath, basePort: 5980, sessionDir });
 
@@ -21,10 +24,7 @@ describe("POST /confirm-document", () => {
       const res = await fetch(new URL("/confirm-document", handle.url), { method: "POST" });
       assert.equal(res.status, 200);
 
-      assert.equal(existsSync(join(sessionDir, "feedback-queue.jsonl")), false);
-      assert.equal(existsSync(join(sessionDir, "submitted-ids.jsonl")), false);
-      assert.equal(existsSync(join(sessionDir, "threads.jsonl")), false);
-      assert.equal(existsSync(join(sessionDir, "thread-roots.jsonl")), false);
+      assert.equal(existsSync(sessionDir), false);
 
       // The response is sent before the server closes, so give the close() a
       // moment to complete rather than asserting synchronously.

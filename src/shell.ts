@@ -22,6 +22,14 @@ export function renderShellPage(fileName: string, filePath: string): string {
 <link rel="alternate icon" href="/favicon.ico" />
 <link rel="apple-touch-icon" href="/favicon-192x192.png" sizes="192x192" />
 <style>
+  :root {
+    --z-review-text: 900;
+    --z-rail-controls: 950;
+    --z-review-element: 1000;
+    --z-review-draft: 1100;
+    --z-toolbar: 1200;
+    --z-modal: 2000;
+  }
   :root[data-theme="dark"] {
     --chrome-bg: rgba(18, 24, 38, 0.72);
     --chrome-bg-solid: #0f1420;
@@ -121,6 +129,7 @@ export function renderShellPage(fileName: string, filePath: string): string {
     gap: 16px;
     box-sizing: border-box;
     position: relative;
+    z-index: var(--z-toolbar);
   }
   #wordmark {
     display: flex;
@@ -363,7 +372,7 @@ export function renderShellPage(fileName: string, filePath: string): string {
     font-size: 11px;
     line-height: 1;
     cursor: pointer;
-    z-index: 950;
+    z-index: var(--z-rail-controls);
   }
   #rail-collapse-all {
     position: absolute;
@@ -378,7 +387,7 @@ export function renderShellPage(fileName: string, filePath: string): string {
     font-size: 12px;
     line-height: 1;
     cursor: pointer;
-    z-index: 950;
+    z-index: var(--z-rail-controls);
   }
   #rail-footer {
     position: absolute;
@@ -419,12 +428,73 @@ export function renderShellPage(fileName: string, filePath: string): string {
     max-height: 300px;
     overflow-y: auto;
   }
+  .answer-text,
+  .bubble-comment {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .anchor-lost-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    position: relative;
+    margin-top: 6px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    line-height: 16px;
+    color: var(--stale-amber-fg);
+    background: var(--stale-amber-bg);
+    z-index: 2;
+  }
+  .anchor-lost-help {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: 700;
+    line-height: 14px;
+    text-align: center;
+    cursor: help;
+  }
+  .anchor-lost-help:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .anchor-lost-tooltip {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: var(--z-toolbar);
+    width: 220px;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--chrome-bg-solid);
+    color: var(--chrome-fg);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.28);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.4;
+    text-align: left;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .anchor-lost-tooltip.visible {
+    opacity: 1;
+    visibility: visible;
+  }
   #confirm-modal-backdrop {
     display: none;
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.4);
-    z-index: 2000;
+    z-index: var(--z-modal);
     align-items: center;
     justify-content: center;
   }

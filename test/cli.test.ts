@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseCliArgs, validateArtifactFile, CliError, main, openReview } from "../src/cli.js";
+import { decodeReplyNewlines, parseCliArgs, validateArtifactFile, CliError, main, openReview } from "../src/cli.js";
 
 describe("parseCliArgs", () => {
   test("parses --help", () => {
@@ -35,6 +35,28 @@ describe("parseCliArgs", () => {
       to: "a-1",
       text: "looks good",
     });
+  });
+
+  test("preserves literal newline escapes unless decoding is explicitly requested", () => {
+    assert.deepEqual(parseCliArgs(["reply", "demo.html", "--to", "a-1", "first\\n\\nsecond"]), {
+      kind: "reply",
+      file: "demo.html",
+      to: "a-1",
+      text: "first\\n\\nsecond",
+    });
+  });
+
+  test("decodes escaped line breaks for multiline reply text when requested", () => {
+    assert.deepEqual(
+      parseCliArgs(["reply", "demo.html", "--to", "a-1", "--decode-newlines", "first\\n\\nsecond"]),
+      {
+        kind: "reply",
+        file: "demo.html",
+        to: "a-1",
+        text: "first\n\nsecond",
+      },
+    );
+    assert.equal(decodeReplyNewlines("first\\r\\nsecond\\rthird"), "first\nsecond\nthird");
   });
 
   test("reply without --to yields an error", () => {

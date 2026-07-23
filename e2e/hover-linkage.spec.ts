@@ -105,7 +105,7 @@ test("hovering a far-away bubble does not scroll, while clicking it scrolls to a
   }
 });
 
-test("a queued bubble whose source element was removed shows Anchor lost and does not highlight", async ({ page }) => {
+test("a queued bubble whose source element was removed explains that its source was not found", async ({ page }) => {
   const localDir = mkdtempSync(join(tmpdir(), "ezreview-hover-linkage-lost-e2e-"));
   const localArtifact = join(localDir, "demo.html");
   copyFileSync(join(import.meta.dirname, "fixtures", "bubble-queue.html"), localArtifact);
@@ -124,9 +124,37 @@ test("a queued bubble whose source element was removed shows Anchor lost and doe
     await localPage.waitForTimeout(1200); // past the watcher's debounce + reload
 
     const bubble = localPage.locator(".bubble");
-    await bubble.hover();
+    const badge = bubble.locator(".anchor-lost-badge");
+    await expect(badge).toBeVisible();
+    await expect(badge.locator(".anchor-lost-label")).toHaveText("Source not found");
+    await expect(badge).not.toContainText("Anchor lost");
+    const help = badge.locator(".anchor-lost-help");
+    const tooltip = localPage.locator(".anchor-lost-tooltip");
+    await expect(help).toHaveAccessibleName("Why the source could not be found");
+    // The status and its help control exist before any pointer interaction,
+    // so keyboard-only users can focus it directly.
+    await help.focus();
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText("element was removed or its structure changed");
 
-    await expect(bubble.locator(".anchor-lost-badge")).toBeVisible();
+    // Exercise the narrowest supported rail and place the source badge at
+    // the bottom edge. The body-level tooltip must stay inside the visible
+    // scroll viewport horizontally and vertically, flipping above as needed.
+    await localPage.locator("#comment-rail").evaluate((rail) => {
+      (rail as HTMLElement).style.width = "180px";
+    });
+    await bubble.evaluate((node) => {
+      (node as HTMLElement).style.marginTop = "900px";
+      node.scrollIntoView({ block: "end" });
+    });
+    await help.blur();
+    await help.focus();
+    const tooltipBox = await tooltip.boundingBox();
+    const railBox = await localPage.locator("#rail-scroll").boundingBox();
+    expect(tooltipBox!.x).toBeGreaterThanOrEqual(railBox!.x);
+    expect(tooltipBox!.x + tooltipBox!.width).toBeLessThanOrEqual(railBox!.x + railBox!.width);
+    expect(tooltipBox!.y).toBeGreaterThanOrEqual(railBox!.y);
+    expect(tooltipBox!.y + tooltipBox!.height).toBeLessThanOrEqual(railBox!.y + railBox!.height);
     await expect(localPage.locator("#element-highlight")).not.toBeVisible();
   } finally {
     await localHandle.close();

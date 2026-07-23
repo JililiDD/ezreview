@@ -14,7 +14,8 @@ export const USAGE = `Usage:
   ezreview reply <file.html> --to <id> "<text>"  Respond to a submitted annotation
 
 Options:
-  -h, --help    Show this help message
+  -h, --help          Show this help message
+  --decode-newlines   In reply text, decode \\n and \\r\\n as line breaks
 `;
 
 export type ParsedArgs =
@@ -24,12 +25,17 @@ export type ParsedArgs =
   | { kind: "reply"; file: string; to: string; text: string }
   | { kind: "error"; message: string };
 
+export function decodeReplyNewlines(text: string): string {
+  return text.replace(/\\r\\n|\\n|\\r/g, "\n");
+}
+
 export function parseCliArgs(argv: string[]): ParsedArgs {
   const { values, positionals } = parseArgs({
     args: argv,
     options: {
       help: { type: "boolean", short: "h" },
       to: { type: "string" },
+      "decode-newlines": { type: "boolean" },
     },
     allowPositionals: true,
   });
@@ -57,7 +63,12 @@ export function parseCliArgs(argv: string[]): ParsedArgs {
     if (!third) {
       return { kind: "error", message: 'reply requires "<text>"' };
     }
-    return { kind: "reply", file: second, to: values.to as string, text: third };
+    return {
+      kind: "reply",
+      file: second,
+      to: values.to as string,
+      text: values["decode-newlines"] ? decodeReplyNewlines(third) : third,
+    };
   }
 
   if (!first) {

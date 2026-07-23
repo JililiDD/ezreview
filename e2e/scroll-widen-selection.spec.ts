@@ -35,9 +35,14 @@ test("mouse wheel no longer widens the hovered element selection", async ({ page
   const frame = page.frameLocator("#artifact-frame");
   const highlight = page.locator("#element-highlight");
   await frame.locator("#cell-0-0").hover();
+  await expect(highlight).toBeVisible();
 
   const cellBox = await frame.locator("#cell-0-0").boundingBox();
-  await page.mouse.wheel(0, 40);
+  // Keep the first row partially visible: the overlay intentionally hides
+  // once its source is fully outside the iframe, which is a separate
+  // clipping behavior from the old wheel-to-parent widening regression.
+  await page.mouse.wheel(0, 10);
+  await expect(highlight).toBeVisible();
   const highlightBox = await highlight.boundingBox();
 
   expect(Math.abs(highlightBox!.width - cellBox!.width)).toBeLessThan(2);

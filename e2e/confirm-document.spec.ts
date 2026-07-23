@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startReviewServer } from "../src/server.ts";
 import type { ReviewServerHandle } from "../src/server.ts";
+import { writeSessionInfo } from "../src/session.ts";
 
 async function startWithFixture(fixtureName: string, basePort: number) {
   const dir = mkdtempSync(join(tmpdir(), "ezreview-confirm-document-e2e-"));
@@ -55,7 +56,7 @@ test("clicking Confirm document while the queue is non-empty is blocked with a s
 test("clicking Confirm document with an empty queue shows a custom confirm modal, and confirming resets the session and locks the page read-only", async ({
   page,
 }) => {
-  const { dir, sessionDir, handle } = await startWithFixture("bubble-queue.html", 6320);
+  const { dir, artifactPath, sessionDir, handle } = await startWithFixture("bubble-queue.html", 6320);
   try {
     await page.goto(handle.url);
     const frame = page.frameLocator("#artifact-frame");
@@ -66,6 +67,7 @@ test("clicking Confirm document with an empty queue shows a custom confirm modal
     await expect(page.locator(".bubble-sent")).toBeVisible();
 
     expect(existsSync(join(sessionDir, "threads.jsonl"))).toBe(true);
+    writeSessionInfo(sessionDir, { port: handle.port, pid: process.pid, file: artifactPath });
 
     await page.locator("#approve").click();
     await expect(page.locator("#confirm-modal-backdrop")).toHaveClass(/visible/);
@@ -78,10 +80,7 @@ test("clicking Confirm document with an empty queue shows a custom confirm modal
     await expect(page.locator("#approve")).toBeDisabled();
     await expect(page.locator("#submit-review")).toBeDisabled();
     await expect(page.locator("#status-dot")).toHaveClass(/disconnected/, { timeout: 3000 });
-    expect(existsSync(join(sessionDir, "threads.jsonl"))).toBe(false);
-    expect(existsSync(join(sessionDir, "feedback-queue.jsonl"))).toBe(false);
-    expect(existsSync(join(sessionDir, "submitted-ids.jsonl"))).toBe(false);
-    expect(existsSync(join(sessionDir, "thread-roots.jsonl"))).toBe(false);
+    expect(existsSync(sessionDir)).toBe(false);
 
     await expect(page.locator("#review-mode-switch")).toHaveAttribute("data-on", "false");
   } finally {

@@ -159,6 +159,14 @@ ezreview reply your_file.html --to annotation_id "Response text"
 
 Quote the response so your shell passes it as one argument. Follow-up replies remain attached to the root annotation thread.
 
+For a multiline response represented with escaped line breaks, add `--decode-newlines`:
+
+```bash
+ezreview reply your_file.html --to annotation_id --decode-newlines "First paragraph\n\nSecond paragraph"
+```
+
+The browser preserves real line breaks and paragraph spacing. Decoding is opt-in so code examples containing a literal `\n` remain unchanged by default.
+
 ## Write review-friendly HTML
 
 The agent can apply feedback more precisely when the artifact stays readable and editable:

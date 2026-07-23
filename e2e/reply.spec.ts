@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startReviewServer } from "../src/server.ts";
@@ -49,11 +49,15 @@ test("an agent reply renders inside the same bubble with an AGENT label, and a f
     const bubble = page.locator(".bubble");
     await expect(bubble.locator(".answer-block .agent-label")).toHaveText("AGENT");
     await expect(bubble.locator(".answer-block .answer-text")).toHaveText("because the API requires it");
+    await expect(bubble.locator(".answer-block")).toHaveCSS("padding-top", "4px");
+    await expect(bubble.locator(".answer-block")).toHaveCSS("padding-bottom", "4px");
 
     // The original comment is styled like a message too — a "ME" label,
     // matching the AGENT block's visual language.
     await expect(bubble.locator(".me-block .me-label")).toHaveText("ME");
     await expect(bubble.locator(".me-block .bubble-comment")).toHaveText("why is this here?");
+    await expect(bubble.locator(".me-block")).toHaveCSS("padding-top", "4px");
+    await expect(bubble.locator(".me-block")).toHaveCSS("padding-bottom", "4px");
 
     // DAC-3: no terminal "✓ Answered" badge — threads have no terminal state.
     await expect(bubble.locator(".answered-badge")).toHaveCount(0);
@@ -102,6 +106,33 @@ test("submitting a follow-up via the persistent input queues it and threads it a
     await expect(bubble.locator(".bubble-thread .me-label")).toHaveText("ME");
     await expect(page.locator("#submit-review")).toHaveText("Submit review (1)");
 
+    await page.locator("#submit-review").click();
+    await expect(page.locator("#submit-review")).toHaveText("Submit review (0)");
+  } finally {
+    await cleanup(dir, handle);
+  }
+});
+
+test("a queued follow-up survives an artifact reload without breaking source-status refresh", async ({ page }) => {
+  const { dir, artifactPath, handle } = await startWithFixture("bubble-queue.html", 6206);
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  try {
+    await page.goto(handle.url);
+    await queueAndSend(page, "root question");
+
+    const bubble = page.locator(".bubble");
+    await bubble.locator(".followup-reply-btn").click();
+    await bubble.locator(".followup-controls textarea").fill("queued follow-up");
+    await bubble.locator(".followup-controls .bubble-add").click();
+    await expect(page.locator("#submit-review")).toHaveText("Submit review (1)");
+
+    const original = readFileSync(artifactPath, "utf-8");
+    writeFileSync(artifactPath, original.replace("</body>", '<p id="reload-marker">reloaded</p></body>'));
+    await expect(page.frameLocator("#artifact-frame").locator("#reload-marker")).toBeVisible();
+
+    expect(pageErrors).toEqual([]);
+    await expect(page.locator("#submit-review")).toHaveText("Submit review (1)");
     await page.locator("#submit-review").click();
     await expect(page.locator("#submit-review")).toHaveText("Submit review (0)");
   } finally {
