@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const QUEUE_FILENAME = "feedback-queue.jsonl";
@@ -88,15 +88,32 @@ export function loadThreadHistory(sessionDir: string, threadId: string): ThreadM
     .sort((a, b) => a.timestamp - b.timestamp);
 }
 
-// Full session reset for "Confirm document": wipes every persisted file for
-// this artifact's sessionDir. Missing files are not an error — a freshly
-// opened session may not have created all four yet.
+// Full session reset for "Confirm document": remove every ezreview-owned
+// output for this artifact, then remove the now-empty dedicated directory.
+// Use an explicit ownership list instead of a recursive delete so an invalid
+// custom sessionDir can never erase unrelated user files. The reviewed artifact
+// lives outside this directory and is never touched here.
 export function resetSessionFiles(sessionDir: string): void {
-  for (const filename of [QUEUE_FILENAME, SUBMITTED_IDS_FILENAME, THREADS_FILENAME, THREAD_ROOTS_FILENAME]) {
-    const path = join(sessionDir, filename);
-    if (existsSync(path)) {
-      unlinkSync(path);
+  if (!existsSync(sessionDir)) return;
+  const sessionStat = lstatSync(sessionDir);
+  if (!sessionStat.isDirectory() || sessionStat.isSymbolicLink()) return;
+  const ownedFiles = new Set([
+    QUEUE_FILENAME,
+    SUBMITTED_IDS_FILENAME,
+    THREADS_FILENAME,
+    THREAD_ROOTS_FILENAME,
+    "session.json",
+  ]);
+  for (const entry of readdirSync(sessionDir, { withFileTypes: true })) {
+    const isInterruptedQueueWrite = /^feedback-queue\.jsonl\.\d+\.tmp$/.test(entry.name);
+    if (entry.isFile() && (ownedFiles.has(entry.name) || isInterruptedQueueWrite)) {
+      unlinkSync(join(sessionDir, entry.name));
     }
+  }
+  try {
+    rmdirSync(sessionDir);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOTEMPTY") throw error;
   }
 }
 

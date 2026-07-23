@@ -61,6 +61,7 @@ ezreview reply report.html --to a-3 "Updated the date to 08-14."
 
 - Use this once for **every submitted annotation** after handling it. Questions get an answer; change requests get a concise completion summary after the file is edited.
 - **Always quote `"<answer text>"` as a single shell argument.** The command only reads exactly one argument after `--to <id>` as the answer text — if you pass it unquoted, your shell will split it on whitespace and only the first word is used as the answer, with the rest silently discarded. Quote it exactly like the example above, always, even for short answers.
+- For a multiline answer represented with `\n` escapes, add `--decode-newlines`; for example, `ezreview reply report.html --to a-3 --decode-newlines "First paragraph\n\nSecond paragraph"`. Do not use this flag when a literal `\n` is part of the answer, such as in a code example.
 - The reviewer sees the response rendered directly inside the annotation bubble in the browser, without needing to reload or re-run `wait`.
 - Threads support multiple rounds. For follow-ups, reply to the `Reply target` printed by `wait`; the server also normalizes a submitted child id to its root thread as a defensive fallback.
 - `reply` does not touch the artifact file at all.

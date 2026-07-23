@@ -166,12 +166,86 @@ test("the queued text annotation gets a Custom Highlight registered in the ifram
     set.forEach((range: Range) => {
       found = range.toString();
     });
-    return { size: set.size, text: found };
+    const styleText = frame.contentDocument!.querySelector("style[data-ezreview-text-highlight]")?.textContent ?? "";
+    return { size: set.size, text: found, styleText };
   });
 
   expect(highlighted).not.toBeNull();
   expect(highlighted!.size).toBe(1);
   expect(highlighted!.text).toBe("testing text selection");
+  expect(highlighted!.styleText).toContain("background-color: rgba(255,196,0,.28)");
+  expect(highlighted!.styleText).toContain("background-color: rgba(255,196,0,.58)");
+});
+
+test("a text annotation gets a dual-contrast edge aligned to its range", async ({ page }) => {
+  await page.goto(handle.url);
+  await selectSubstring(page, "#para", "testing text selection");
+  await queueCurrentSelection(page, "x");
+
+  const edge = page.locator("#text-highlight-overlay .text-highlight-edge-normal");
+  await expect(edge).toHaveCount(1);
+
+  const geometry = await page.evaluate(() => {
+    const frame = document.getElementById("artifact-frame") as HTMLIFrameElement;
+    const item = (window as any).__annotationQueue[0];
+    const rangeRect = item.range.getClientRects()[0];
+    const frameRect = frame.getBoundingClientRect();
+    const edgeRect = document.querySelector(".text-highlight-edge-normal")!.getBoundingClientRect();
+    const style = getComputedStyle(document.querySelector(".text-highlight-edge-normal")!);
+    return {
+      expectedLeft: frameRect.left + rangeRect.left - 2,
+      expectedTop: frameRect.top + rangeRect.top - 1,
+      expectedWidth: rangeRect.width + 4,
+      expectedHeight: rangeRect.height + 2,
+      actual: { left: edgeRect.left, top: edgeRect.top, width: edgeRect.width, height: edgeRect.height },
+      borderColor: style.borderTopColor,
+      boxShadow: style.boxShadow,
+    };
+  });
+
+  expect(Math.abs(geometry.actual.left - geometry.expectedLeft)).toBeLessThanOrEqual(1);
+  expect(Math.abs(geometry.actual.top - geometry.expectedTop)).toBeLessThanOrEqual(1);
+  expect(Math.abs(geometry.actual.width - geometry.expectedWidth)).toBeLessThanOrEqual(1);
+  expect(Math.abs(geometry.actual.height - geometry.expectedHeight)).toBeLessThanOrEqual(1);
+  expect(geometry.borderColor).toBe("rgba(255, 255, 255, 0.96)");
+  expect(geometry.boxShadow).toContain("rgba(0, 0, 0, 0.88)");
+});
+
+test("a multi-line selection gets one dual-contrast edge per rendered line", async ({ page }) => {
+  await page.goto(handle.url);
+  await page.frameLocator("#artifact-frame").locator("#para").evaluate((paragraph) => {
+    paragraph.style.width = "180px";
+  });
+  await selectSubstring(page, "#para", "sentence for testing text selection annotation behavior");
+
+  await expect.poll(() => page.locator("#text-highlight-overlay .text-highlight-edge-normal").count()).toBeGreaterThan(1);
+});
+
+test("dual-contrast edges stay aligned while the iframe scrolls", async ({ page }) => {
+  await page.goto(handle.url);
+  await page.frameLocator("#artifact-frame").locator("body").evaluate((body) => {
+    body.style.minHeight = "1200px";
+  });
+  await selectSubstring(page, "#para", "testing text selection");
+  await queueCurrentSelection(page, "x");
+
+  const alignmentError = () => page.evaluate(() => {
+    const frame = document.getElementById("artifact-frame") as HTMLIFrameElement;
+    const rangeRect = (window as any).__annotationQueue[0].range.getClientRects()[0];
+    const frameRect = frame.getBoundingClientRect();
+    const edgeRect = document.querySelector(".text-highlight-edge-normal")!.getBoundingClientRect();
+    return {
+      left: Math.abs(edgeRect.left - (frameRect.left + rangeRect.left - 2)),
+      top: Math.abs(edgeRect.top - (frameRect.top + rangeRect.top - 1)),
+    };
+  });
+
+  await expect.poll(async () => (await alignmentError()).top).toBeLessThanOrEqual(1);
+  await page.frameLocator("#artifact-frame").locator("body").evaluate((body) => {
+    body.ownerDocument!.defaultView!.scrollBy(0, 24);
+  });
+  await expect.poll(async () => (await alignmentError()).left).toBeLessThanOrEqual(1);
+  await expect.poll(async () => (await alignmentError()).top).toBeLessThanOrEqual(1);
 });
 
 test("Cancel removes the preview highlight without queueing anything", async ({ page }) => {
@@ -185,6 +259,7 @@ test("Cancel removes the preview highlight without queueing anything", async ({ 
     return win.CSS.highlights.get("ai-review-text").size;
   });
   expect(size).toBe(0);
+  await expect(page.locator("#text-highlight-overlay .text-highlight-edge")).toHaveCount(0);
 
   const queueLength = await page.evaluate(() => (window as any).__annotationQueue.length);
   expect(queueLength).toBe(0);
@@ -201,6 +276,8 @@ test("hovering a queued (not-lost) text annotation deepens its highlight and rev
     return { normal: win.CSS.highlights.get("ai-review-text").size, hover: win.CSS.highlights.get("ai-review-text-hover").size };
   });
   expect(before).toEqual({ normal: 1, hover: 0 });
+  await expect(page.locator("#text-highlight-overlay .text-highlight-edge-normal")).toHaveCount(1);
+  await expect(page.locator("#text-highlight-overlay .text-highlight-edge-hover")).toHaveCount(0);
 
   await page.locator(".bubble").hover();
   const during = await page.evaluate(() => {
@@ -209,6 +286,8 @@ test("hovering a queued (not-lost) text annotation deepens its highlight and rev
     return { normal: win.CSS.highlights.get("ai-review-text").size, hover: win.CSS.highlights.get("ai-review-text-hover").size };
   });
   expect(during).toEqual({ normal: 0, hover: 1 });
+  await expect(page.locator("#text-highlight-overlay .text-highlight-edge-normal")).toHaveCount(0);
+  await expect(page.locator("#text-highlight-overlay .text-highlight-edge-hover")).toHaveCount(1);
 
   await page.mouse.move(5, 5);
   const after = await page.evaluate(() => {
@@ -217,6 +296,8 @@ test("hovering a queued (not-lost) text annotation deepens its highlight and rev
     return { normal: win.CSS.highlights.get("ai-review-text").size, hover: win.CSS.highlights.get("ai-review-text-hover").size };
   });
   expect(after).toEqual({ normal: 1, hover: 0 });
+  await expect(page.locator("#text-highlight-overlay .text-highlight-edge-normal")).toHaveCount(1);
+  await expect(page.locator("#text-highlight-overlay .text-highlight-edge-hover")).toHaveCount(0);
 });
 
 test("hovering a far-away text comment does not scroll, while clicking it scrolls the source range into view", async ({ page }) => {
@@ -276,8 +357,15 @@ test("a text annotation queued before a reload is marked lost after the reload",
     await page.waitForTimeout(1200);
 
     const bubble = page.locator(".bubble");
-    await bubble.hover();
-    await expect(bubble.locator(".anchor-lost-badge")).toBeVisible();
+    const lostBadge = bubble.locator(".anchor-lost-badge");
+    await expect(lostBadge).toBeVisible();
+    await expect(lostBadge.locator(".anchor-lost-label")).toHaveText("Source not found");
+    await lostBadge.locator(".anchor-lost-help").focus();
+    const lostTooltip = page.locator(".anchor-lost-tooltip");
+    await expect(lostTooltip).toBeVisible();
+    await expect(lostTooltip).toContainText("the selected text");
+    await expect(lostTooltip).toContainText("the nearby text before and after it changed");
+    await expect(page.locator("#text-highlight-overlay .text-highlight-edge")).toHaveCount(0);
   } finally {
     await localHandle.close();
     rmSync(localDir, { recursive: true, force: true });
@@ -289,7 +377,7 @@ test("a text annotation that was already Sent before a reload is also marked los
   // so a text annotation already moved into sentItems by Submit review kept
   // lost === false forever. Its Range still pointed at the pre-reload
   // iframe document, so hovering it neither highlighted anything (the
-  // Range's nodes are gone) nor showed the Anchor lost badge — a silent,
+  // Range's nodes are gone) nor showed the Source not found badge — a silent,
   // confusing dead end a real reviewer hit manually.
   const localDir = mkdtempSync(join(tmpdir(), "ezreview-text-sent-reload-e2e-"));
   const localArtifact = join(localDir, "demo.html");
@@ -326,6 +414,14 @@ test("a text annotation survives a reload that only edited an unrelated part of 
     await page.goto(localHandle.url);
     await selectSubstring(page, "#para", "testing text selection");
     await queueCurrentSelection(page, "x");
+    await page.evaluate(() => {
+      (window as any).__sawSourceNotFound = false;
+      new MutationObserver(() => {
+        if (document.querySelector(".anchor-lost-badge")) {
+          (window as any).__sawSourceNotFound = true;
+        }
+      }).observe(document.body, { childList: true, subtree: true });
+    });
 
     // Targeted replace (like a real Edit call) — only the unrelated
     // #mid-span text changes; everything else, including surrounding
@@ -338,6 +434,8 @@ test("a text annotation survives a reload that only edited an unrelated part of 
     const bubble = page.locator(".bubble");
     await bubble.hover();
     await expect(bubble.locator(".anchor-lost-badge")).toHaveCount(0);
+    expect(await page.evaluate(() => (window as any).__sawSourceNotFound)).toBe(false);
+    await expect(page.locator("#text-highlight-overlay .text-highlight-edge-hover")).toHaveCount(1);
   } finally {
     await localHandle.close();
     rmSync(localDir, { recursive: true, force: true });
