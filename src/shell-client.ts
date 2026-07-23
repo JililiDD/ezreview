@@ -730,7 +730,7 @@ export function renderClientScript(): string {
   }
 
   var TEXT_SOURCE_NOT_FOUND_DETAIL =
-    "The original selection not found because its text and the nearby text before and after it changed.";
+    "The original selection not found because its text and the surrounding text changed.";
   var ELEMENT_SOURCE_NOT_FOUND_DETAIL =
     "The referenced element not found because it was removed or its element structure changed.";
 
