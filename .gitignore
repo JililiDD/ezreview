@@ -8,4 +8,5 @@ playwright-report/
 tmp-demo/
 .claude/
 .npmrc
+PRODUCT.md
 demo/
